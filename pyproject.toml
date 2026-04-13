@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["generative-processes"]
+
+[project]
+name = "generative-processes"
+version = "0.1"
+description = "Generative Processes"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["jax>=0.9.0"]
+
+[project.optional-dependencies]
+dev = ["pylint", "pyright", "pytest", "ruff"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+ignore = [
+    "D100",   # undocumented-public-module
+    "D105",   # Missing docstring in magic method
+    "D107",   # Missing docstring in __init__
+    "SIM108", # Use the ternary operator
+]
+select = [
+    "A",   # flake8-builtins
+    "B",   # flake8-bugbear
+    "D",   # pydocstyle https://www.pydocstyle.org/en/stable/error_codes.html
+    "E",   # pycodestyle
+    "F",   # Pyflakes
+    "I",   # isort
+    "PT",  # flake8-pytest-style
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["D"]
+"*.ipynb" = ["D"]
+
+[tool.pylint."MESSAGES CONTROL"]
+# Disable line-too-long check since ruff handles line length (120 chars)
+disable = ["line-too-long", "duplicate-code"]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+reportUnnecessaryEllipsis = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+pythonpath = ["."]
+addopts = ["--strict-markers", "--strict-config"]
+markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
