@@ -46,6 +46,8 @@ def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_t
     def validate_sigma(sigma_list: list[jax.Array]) -> bool:
         if len(sigma_list) != len(Ts_list):
             return False
+        if not all(jnp.issubdtype(sigma_i.dtype, jnp.integer) for sigma_i in sigma_list):
+            return False
         if not all(jnp.all(jnp.isfinite(sigma_i)) for sigma_i in sigma_list):
             return False
         if not all(jnp.all(sigma_i >= 0) for sigma_i in sigma_list):
