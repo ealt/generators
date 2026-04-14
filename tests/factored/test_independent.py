@@ -5,26 +5,23 @@ import jax.numpy as jnp
 import pytest
 
 from src.factored.independent import (
-    Data,
     compile_matrices,
     generate,
+    init,
     obs_dist,
     seq_prob,
     validate,
 )
-from src.factored.independent import (
-    init as init_factored,
-)
 from src.ghmm.process import validate as validate_factor
 from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
-from tests.transition_matrices import zero_one, zero_one_two
+from tests.transition_matrices import cycle, zero_one
 
 
 def test_compile():
     """Independent factors should compile into a single valid GHMM."""
     Ts_list = [
         jnp.array(zero_one()),
-        jnp.array(zero_one_two()),
+        jnp.array(cycle(3, 1.0)),
     ]
     assert validate(Ts_list)
 
@@ -40,19 +37,32 @@ def test_compile():
     assert jnp.allclose(composite, expected)
 
 
-@pytest.fixture
-def data() -> Data:
-    """A factored process with two independent factors."""
+def test_init():
     Ts_list = [
         jnp.array(zero_one()),
-        jnp.array(zero_one_two()),
+        jnp.array(cycle(3, 1.0)),
     ]
-    assert validate(Ts_list)
-    return init_factored(Ts_list)
+    data = init(Ts_list)
+    assert data.Ts.shape == (2, 3, 3, 3)
+    assert jnp.allclose(data.Ts[0, :2, :2, :2], jnp.array([zero_one()]))
+    assert jnp.all(data.Ts[0, 2, :, :] == 0)
+    assert jnp.all(data.Ts[0, :, 2, :] == 0)
+    assert jnp.all(data.Ts[0, :, :, 2] == 0)
+    assert jnp.allclose(data.Ts[1], jnp.array([cycle(3, 1.0)]))
+    assert jnp.allclose(data.eta_0, jnp.array([[1 / 2, 1 / 2, 0], [1 / 3, 1 / 3, 1 / 3]]))
+    assert jnp.allclose(data.w, jnp.array([[1, 1, 0], [1, 1, 1]]))
+    assert jnp.allclose(data.Vs, jnp.array([2, 3]))
+    assert jnp.allclose(data.Ss, jnp.array([2, 3]))
+    assert data.V == 6
 
 
-def test_obs_dist(data: Data):
+def test_obs_dist():
     """The factored observation distribution should match the product of factor marginals."""
+    Ts_list = [
+        jnp.array(zero_one()),
+        jnp.array(cycle(3, 1.0)),
+    ]
+    data = init(Ts_list)
     eta = jnp.array([[0.8, 0.2, 0.0], [0.1, 0.6, 0.3]])
     weights = mixed_radix_weights(data.Vs)
     decode = partial(mixed_radix_decode, Vs=data.Vs, weights=weights)
@@ -61,8 +71,13 @@ def test_obs_dist(data: Data):
     assert jnp.allclose(actual, expected)
 
 
-def test_generate(data: Data):
+def test_generate():
     """The generate function should return a valid sequence and belief state."""
+    Ts_list = [
+        jnp.array(zero_one()),
+        jnp.array(cycle(3, 1.0)),
+    ]
+    data = init(Ts_list)
     keys = jax.random.split(jax.random.key(0), 12)
     weights = mixed_radix_weights(data.Vs)
     encode = partial(mixed_radix_encode, weights=weights)
@@ -75,8 +90,13 @@ def test_generate(data: Data):
     assert jnp.any(jnp.array([jnp.all(jnp.roll(xs, i) == expected) for i in range(6)]))
 
 
-def test_seq_prob(data: Data):
+def test_seq_prob():
     """The sequence probability should be correct."""
+    Ts_list = [
+        jnp.array(zero_one()),
+        jnp.array(cycle(3, 1.0)),
+    ]
+    data = init(Ts_list)
     xs = jnp.array([0, 3, 4, 1, 2, 5])
     weights = mixed_radix_weights(data.Vs)
     decode = partial(mixed_radix_decode, Vs=data.Vs, weights=weights)

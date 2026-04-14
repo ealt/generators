@@ -41,27 +41,6 @@ def zero_one() -> list[list[list[float]]]:
     ]
 
 
-def zero_one_two() -> list[list[list[float]]]:
-    """Generate the transition matrices for a zero-one-two process."""
-    return [
-        [
-            [0, 1, 0],
-            [0, 0, 0],
-            [0, 0, 0],
-        ],
-        [
-            [0, 0, 0],
-            [0, 0, 1],
-            [0, 0, 0],
-        ],
-        [
-            [0, 0, 0],
-            [0, 0, 0],
-            [1, 0, 0],
-        ],
-    ]
-
-
 def zero_one_random(p: float) -> list[list[list[float]]]:
     """Generate the transition matrices for a zero-one random process."""
     q = 1 - p
@@ -77,3 +56,14 @@ def zero_one_random(p: float) -> list[list[list[float]]]:
             [p, 0, 0],
         ],
     ]
+
+
+def cycle(n: int, p: float) -> list[list[list[float]]]:
+    """Generate the transition matrices for a cycle process."""
+    assert n >= 3
+    q = 1 - p
+    Ts: list[list[list[float]]] = [[[0.0 for _ in range(n)] for _ in range(n)] for _ in range(n)]
+    for i in range(n):
+        Ts[i][i][(i + 1) % n] = p
+        Ts[i][i][(i - 1) % n] = q
+    return Ts
