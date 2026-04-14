@@ -19,8 +19,12 @@ def pad(arr: jax.Array, target_shape: tuple[int, ...]) -> jax.Array:
 
 
 def stack(arrs: list[jax.Array]) -> jax.Array:
-    """Stack a list of arrays."""
-    max_shape = max(arr.shape for arr in arrs)
+    """Stack a list of arrays.
+
+    len(arr.shape) must be the same for all arrays
+    """
+    shapes = [arr.shape for arr in arrs]
+    max_shape = tuple(max(shape_i) for shape_i in zip(*shapes, strict=True))
     return jnp.stack([pad(arr, max_shape) for arr in arrs])
 
 
