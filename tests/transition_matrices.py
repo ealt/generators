@@ -41,6 +41,27 @@ def zero_one() -> list[list[list[float]]]:
     ]
 
 
+def zero_one_two() -> list[list[list[float]]]:
+    """Generate the transition matrices for a zero-one-two process."""
+    return [
+        [
+            [0, 1, 0],
+            [0, 0, 0],
+            [0, 0, 0],
+        ],
+        [
+            [0, 0, 0],
+            [0, 0, 1],
+            [0, 0, 0],
+        ],
+        [
+            [0, 0, 0],
+            [0, 0, 0],
+            [1, 0, 0],
+        ],
+    ]
+
+
 def zero_one_random(p: float) -> list[list[list[float]]]:
     """Generate the transition matrices for a zero-one random process."""
     q = 1 - p
