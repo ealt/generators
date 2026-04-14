@@ -14,11 +14,16 @@ class Data(NamedTuple):
     Ts: jnp.ndarray
     eta_0: jnp.ndarray
     w: jnp.ndarray
-    V: int
 
 
 def validate_transition_matrix(Ts: jnp.ndarray) -> bool:
     """Validate a single transition matrix."""
+    if len(Ts.shape) != 3:
+        return False
+    if any(dim == 0 for dim in Ts.shape):
+        return False
+    if Ts.shape[1] != Ts.shape[2]:
+        return False
     if not jnp.all(jnp.isfinite(Ts)) or not jnp.all(Ts >= 0):
         return False
     T = jnp.sum(Ts, axis=0)
@@ -43,8 +48,7 @@ def init(Ts: jnp.ndarray) -> Data:
     """Compute the data of a GHMM."""
     w = normalizing_ev(Ts)
     eta_0 = stationary_dist(Ts, w)
-    V = Ts.shape[0]
-    return Data(Ts=Ts, eta_0=eta_0, w=w, V=V)
+    return Data(Ts=Ts, eta_0=eta_0, w=w)
 
 
 def obs_dist(data: Data, eta: jnp.ndarray) -> jnp.ndarray:
