@@ -271,7 +271,9 @@ $$
 \{T_{i \mid k}^{(x^i)}\}_{k=1}^{K_i}
 $$
 
-sharing a common local vocabulary size $V_i$ and local state dimension $S_i$. Each factor has its own state representative $\boldsymbol{\eta}^i$.
+sharing a common local observation alphabet $\{1, \ldots, V_i\}$ and a common local state space $\mathbb{R}_{\ge 0}^{S_i}$ expressed in one fixed coordinate system. Each factor has its own state representative $\boldsymbol{\eta}^i$.
+
+Equivalently, the variants of a single factor are alternative dynamics for one fixed local factor, not different local factors. Token identities and hidden-state coordinates are therefore shared across variants of that factor.
 
 v1.0 factored processes are therefore GHMM/HMM-factor compositions. A more general factor-interface abstraction is reserved for a future version.
 
@@ -321,7 +323,18 @@ The only exact emission schemes normatively defined in v1.0 are the supported on
 
 If the emission dependency graph is cyclic, the only defined v1.0 semantics is the fully conditional approximation of §4.6.3.
 
+For each factor $i$, its variants must satisfy all of the following:
+
+1. Every variant acts on the same local state space $\mathbb{R}_{\ge 0}^{S_i}$ in the same coordinate basis. If a producer's internal variants differ only by a hidden-state relabeling, they must be converted to one common basis before serialization.
+2. Every variant uses the same local observation alphabet $\{1, \ldots, V_i\}$ with common token identities. Different variants may assign different probabilities to a token, including zero, but they must not reinterpret what that token ID means.
+3. Every variant uses the same state-representation convention for $\boldsymbol{\eta}^i$: a nonzero nonnegative row vector with the GHMM projective semantics of §3.
+4. Every variant is individually valid as a local process of its declared type, i.e. each per-variant family $\{T_{i \mid k}^{(x^i)}\}_{x^i=1}^{V_i}$ satisfies the validity conditions of §3 for `ghmm`, or §3.2.1 for `hmm`.
+
+Variants of a factor are **not** required to share the same normalizing eigenvector $\mathbf{w}_{i \mid k}$, stationary left eigenvector $\boldsymbol{\pi}_{i \mid k}$, stationary canonical representative, support, or transition structure.
+
 Except in the $Z = 0$ fallback branch of §4.6.3, a factor update denominator of zero is undefined. For every reachable prior factor-state tuple, any composite observation assigned positive probability by the current joint law must induce defined selected updates for all factors.
+
+When the selected variant changes, the factor state is carried forward directly in the common factor coordinate system. If two variants have different normalizing eigenvectors, the same concrete row vector may be canonical for one variant gauge and non-canonical for another. This is valid in v1.0; canonical normalization is always relative to the variant whose $\mathbf{w}_{i \mid k}$ is being used in the current formula.
 
 ### 4.3 Observation probability distribution
 
@@ -525,6 +538,8 @@ A hybrid factored process may use one supported emission scheme (fixed or sequen
 A factored process has a default initial state whenever every factor has a defined default initial state. In that case, the default composite initial state is the ordered tuple of the per-factor defaults.
 
 For independent factors with a single variant each, this default composite initial state is stationary and equals the tuple of the per-factor stationary predictive states.
+
+If a factor has multiple variants, those variants may have different stationary predictive states and different normalizing gauges. Accordingly, v1.0 does not define a single variant-independent stationary object or canonical default state for that factor; this is why §4.1 requires an explicit `initial_state` when $K_i > 1$.
 
 For other factored-process couplings, v1.0 does not define a general stationary object. The existence of a default initial state does not imply stationarity.
 
@@ -731,7 +746,7 @@ The `hmm` tag indicates that the HMM-specific validity constraints of §3.2.1 ap
 }
 ```
 
-For each factor, `transition_matrices` is a 4D array of shape `[K, V, S, S]`. For v1.0 factored processes, each factor's `component_type` must be either `"ghmm"` or `"hmm"`. For each factor, each per-variant `[V, S, S]` block of `transition_matrices` must already be in the spectrally normalized gauge of §3.1. If `vocab_size` is present, it must equal the `V` dimension of that factor's `transition_matrices`. If a factor has `K = 1` and omits `initial_state`, it defaults to the stationary predictive state of its sole local variant. If a factor has `K > 1`, its `initial_state` must be explicit. A factored process may additionally include a `composite_encoding` object when it uses a sparse composite vocabulary.
+For each factor, `transition_matrices` is a 4D array of shape `[K, V, S, S]`. For v1.0 factored processes, each factor's `component_type` must be either `"ghmm"` or `"hmm"`, and all of that factor's variants live under that one declared type. For each factor, each per-variant `[V, S, S]` block of `transition_matrices` must already be in the spectrally normalized gauge of §3.1 and must be individually valid for the declared `component_type`. The variants of a factor share one local token alphabet and one hidden-state coordinate system; they need not share the same normalizing eigenvector or stationary distribution. If `vocab_size` is present, it must equal the `V` dimension of that factor's `transition_matrices`. If a factor has `K = 1` and omits `initial_state`, it defaults to the stationary predictive state of its sole local variant. If a factor has `K > 1`, its `initial_state` must be explicit. A factored process may additionally include a `composite_encoding` object when it uses a sparse composite vocabulary.
 
 **Nonergodic mixture:**
 
