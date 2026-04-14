@@ -2,7 +2,6 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from src.factored.independent import (
     compile_matrices,
