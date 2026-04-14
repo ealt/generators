@@ -51,8 +51,8 @@ def init(Ts_list: list[jax.Array]) -> Data:
     Ts = stack([factor.Ts for factor in factors])
     eta_0 = stack([factor.eta_0 for factor in factors])
     w = stack([factor.w for factor in factors])
-    Vs = jnp.array([factor.Ts.shape[0] for factor in factors])
-    Ss = jnp.array([factor.Ts.shape[1] for factor in factors])
+    Vs = jnp.array([Ts.shape[0] for Ts in Ts_list])
+    Ss = jnp.array([Ts.shape[1] for Ts in Ts_list])
     V = int(jnp.prod(Vs))
     return Data(Ts=Ts, eta_0=eta_0, w=w, Vs=Vs, Ss=Ss, V=V)
 
@@ -81,7 +81,7 @@ def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
     Encode the composite observation as a post-processing step if desired.
     """
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
-    num_factors = int(data.Vs.shape[0])
+    num_factors = int(data.Ts.shape[0])
     keys = jax.random.split(key, num_factors)
     return jax.vmap(sample_factor, in_axes=0)(factor_data, eta, keys)
 
@@ -108,12 +108,12 @@ def generate(
     Returns the final belief state and a sequence of composite observations.
     """
 
-    def fn(eta, key):
+    def step(eta, key):
         factor_xs = sample(data, eta, key)
         x = encode(factor_xs)
         return update(data, eta, factor_xs), x
 
-    return jax.lax.scan(fn, eta, keys)
+    return jax.lax.scan(step, eta, keys)
 
 
 def seq_prob(data: Data, xs: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
