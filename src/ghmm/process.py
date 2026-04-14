@@ -11,12 +11,12 @@ from src.utils import principal_ev
 class Data(NamedTuple):
     """Typed dictionary."""
 
-    Ts: jnp.ndarray
-    eta_0: jnp.ndarray
-    w: jnp.ndarray
+    Ts: jax.Array
+    eta_0: jax.Array
+    w: jax.Array
 
 
-def validate(Ts: jnp.ndarray) -> bool:
+def validate(Ts: jax.Array) -> bool:
     """Validate a single transition matrix."""
     if len(Ts.shape) != 3:
         return False
@@ -31,48 +31,37 @@ def validate(Ts: jnp.ndarray) -> bool:
     return bool(jnp.isclose(norm, 1))
 
 
-def normalizing_ev(Ts: jnp.ndarray) -> jnp.ndarray:
-    """Compute the normalizing eigenvector of a GHMM."""
-    T = Ts.sum(axis=0)
-    return principal_ev(T)
-
-
-def stationary_dist(Ts: jnp.ndarray, w: jnp.ndarray) -> jnp.ndarray:
-    """Compute the stationary distribution of a GHMM."""
-    T = Ts.sum(axis=0)
-    eta_0 = principal_ev(T.T)
-    return eta_0 / (eta_0 @ w)
-
-
-def init(Ts: jnp.ndarray) -> Data:
+def init(Ts: jax.Array) -> Data:
     """Compute the data of a GHMM."""
-    w = normalizing_ev(Ts)
-    eta_0 = stationary_dist(Ts, w)
+    T = Ts.sum(axis=0)
+    w = principal_ev(T)
+    eta_0 = principal_ev(T.T)
+    eta_0 /= eta_0 @ w
     return Data(Ts=Ts, eta_0=eta_0, w=w)
 
 
-def obs_dist(data: Data, eta: jnp.ndarray) -> jnp.ndarray:
+def obs_dist(data: Data, eta: jax.Array) -> jax.Array:
     """Compute the observation distribution of a GHMM."""
     return eta @ data.Ts @ data.w
 
 
-def sample(data: Data, eta: jnp.ndarray, key: jnp.ndarray) -> jnp.ndarray:
+def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
     """Sample a token from a GHMM."""
     probs = obs_dist(data, eta)
     logits = jnp.where(probs > 0, jnp.log(probs), -jnp.inf)
     return jax.random.categorical(key, logits)
 
 
-def update(data: Data, eta: jnp.ndarray, x: jnp.ndarray) -> jnp.ndarray:
+def update(data: Data, eta: jax.Array, x: jax.Array) -> jax.Array:
     """Compute the belief update of a GHMM."""
     eta = eta @ data.Ts[x]
     return eta / (eta @ data.w)
 
 
-def generate(data: Data, eta: jnp.ndarray, keys: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+def generate(data: Data, eta: jax.Array, keys: jax.Array) -> tuple[jax.Array, jax.Array]:
     """Generate a sequence from a GHMM."""
 
-    def fn(eta: jnp.ndarray, key: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def fn(eta: jax.Array, key: jax.Array) -> tuple[jax.Array, jax.Array]:
         x = sample(data, eta, key)
         eta = update(data, eta, x)
         return eta, x
@@ -80,7 +69,7 @@ def generate(data: Data, eta: jnp.ndarray, keys: jnp.ndarray) -> tuple[jnp.ndarr
     return jax.lax.scan(fn, eta, keys)
 
 
-def seq_prob(data: Data, xs: jnp.ndarray) -> jnp.ndarray:
+def seq_prob(data: Data, xs: jax.Array) -> jax.Array:
     """Compute the sequence probability of a GHMM."""
 
     def fn(eta, x):
