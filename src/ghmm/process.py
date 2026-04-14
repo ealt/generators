@@ -16,7 +16,7 @@ class Data(NamedTuple):
     w: jnp.ndarray
 
 
-def validate_transition_matrix(Ts: jnp.ndarray) -> bool:
+def validate(Ts: jnp.ndarray) -> bool:
     """Validate a single transition matrix."""
     if len(Ts.shape) != 3:
         return False
@@ -69,18 +69,13 @@ def belief_update(data: Data, eta: jnp.ndarray, x: jnp.ndarray) -> jnp.ndarray:
     return eta / (eta @ data.w)
 
 
-def generate(
-    data: Data, n: int, key: jnp.ndarray, *, eta: jnp.ndarray | None = None
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+def generate(data: Data, eta: jnp.ndarray, keys: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Generate a sequence from a GHMM."""
-    if eta is None:
-        eta = data.eta_0
 
-    keys = jax.random.split(key, n)
-
-    def fn(eta, key):
+    def fn(eta: jnp.ndarray, key: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
         x = sample(data, eta, key)
-        return belief_update(data, eta, x), x
+        eta = belief_update(data, eta, x)
+        return eta, x
 
     return jax.lax.scan(fn, eta, keys)
 
