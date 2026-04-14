@@ -63,7 +63,7 @@ def sample(data: Data, eta: jnp.ndarray, key: jnp.ndarray) -> jnp.ndarray:
     return jax.random.categorical(key, logits)
 
 
-def belief_update(data: Data, eta: jnp.ndarray, x: jnp.ndarray) -> jnp.ndarray:
+def update(data: Data, eta: jnp.ndarray, x: jnp.ndarray) -> jnp.ndarray:
     """Compute the belief update of a GHMM."""
     eta = eta @ data.Ts[x]
     return eta / (eta @ data.w)
@@ -74,7 +74,7 @@ def generate(data: Data, eta: jnp.ndarray, keys: jnp.ndarray) -> tuple[jnp.ndarr
 
     def fn(eta: jnp.ndarray, key: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
         x = sample(data, eta, key)
-        eta = belief_update(data, eta, x)
+        eta = update(data, eta, x)
         return eta, x
 
     return jax.lax.scan(fn, eta, keys)
