@@ -1,9 +1,4 @@
-"""Factored process.
-
-factors: list[FactorData]  # F x (K_i, V_i, S_i, S_i)
-sigma_emit: list[jax.Array]  # F x (V_i-1)
-sigma_trans: list[jax.Array]  # F x (V_i-1)
-"""
+"""Factored process."""
 
 from collections.abc import Callable
 from typing import Any, NamedTuple
@@ -29,8 +24,8 @@ class Data(NamedTuple):
     Vs: jax.Array
     Ss: jax.Array
     V: int
-    sigma_emit: list[jax.Array]
-    sigma_trans: list[jax.Array]
+    sigma_emit: jax.Array
+    sigma_trans: jax.Array
 
 
 def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> bool:
@@ -44,8 +39,6 @@ def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_t
         all(validate_variant(Ts_i[k]) for k in range(int(Ks_i))) for Ts_i, Ks_i in zip(Ts_list, Ks, strict=True)
     ):
         return False
-
-    # TODO: validate that all variants have close principal eigenvalues for each factor
 
     Vs = jnp.array([Ts_i.shape[1] for Ts_i in Ts_list])
     Vs_prev = jnp.roll(Vs, 1).at[0].set(1)
@@ -71,7 +64,7 @@ def compile_matrices(
     ...  # TODO: implement this
 
 
-def init(Ts_list: list[jax.Array], sigma_emit: list[jax.Array], sigma_trans: list[jax.Array]) -> Data:
+def init(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> Data:
     """Initialize the data of a factored process."""
     factors = [init_factor(Ts[0]) for Ts in Ts_list]
     Ts = stack([factor.Ts for factor in factors])
@@ -81,6 +74,8 @@ def init(Ts_list: list[jax.Array], sigma_emit: list[jax.Array], sigma_trans: lis
     Vs = jnp.array([Ts.shape[1] for Ts in Ts_list])
     Ss = jnp.array([Ts.shape[2] for Ts in Ts_list])
     V = int(jnp.prod(Vs))
+    sigma_emit = stack(sigma_emit_list)
+    sigma_trans = stack(sigma_trans_list)
     return Data(Ts=Ts, eta_0=eta_0, w=w, Ks=Ks, Vs=Vs, Ss=Ss, V=V, sigma_emit=sigma_emit, sigma_trans=sigma_trans)
 
 
