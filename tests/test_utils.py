@@ -5,15 +5,15 @@ from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weight
 
 def test_principal_ev():
     """Principal eigenvector should be the same as the eigenvector with the largest eigenvalue."""
-    T = 7 * jnp.array(
+    T = jnp.array(
         [
-            [6, 3],
-            [0, 9],
+            [14, -6],
+            [6, -1],
         ]
     )
     actual = principal_ev(T)
-    expected = jnp.array([1, 1])
-    assert jnp.array_equal(actual, expected)
+    expected = jnp.array([2, 1]) * (2 / 3)
+    assert jnp.allclose(actual, expected)
 
 
 def test_stack():
