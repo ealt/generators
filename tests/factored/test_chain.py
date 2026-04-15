@@ -2,39 +2,42 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from src.factored.chain import (
-    Data,
-    compile_matrices,
+    compile,
     generate,
     init,
     obs_dist,
     seq_prob,
     validate,
+    validate_eta,
 )
 from src.ghmm.process import validate as validate_ghmm
 from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
 from tests.transition_matrices import cycle, zero_one
 
-# def test_compile():
-#     """Independent factors should compile into a single valid GHMM."""
-#     Ts_list = [
-#         jnp.array(zero_one()),
-#         jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
-#     ]
-#     sigma_emit_list = [
-#         jnp.array([0]),
-#         jnp.array([0, 1]),
-#     ]
-#     sigma_trans_list = [
-#         jnp.array([0]),
-#         jnp.array([0, 1]),
-#     ]
-#     composite = compile_matrices(Ts_list, sigma_emit_list, sigma_trans_list)
-#     assert validate_ghmm(composite)
-#     expected = jnp.array([...])
-#     assert jnp.allclose(composite, expected)
+
+def test_compile():
+    """Single-selector chains should compile into the expected composite operators."""
+    Ts_list = [
+        jnp.array([zero_one()]),
+        jnp.array([cycle(3, 1.0), cycle(3, 0.0)]),
+    ]
+    sigma_list = [
+        jnp.array([0]),
+        jnp.array([0, 1]),
+    ]
+
+    composite = compile(Ts_list, sigma_list)
+    assert validate_ghmm(composite)
+    expected = jnp.zeros((6, 6, 6))
+    expected = expected.at[0, 0, 3].set(1)  # (0, 0) -> (1, 1)
+    expected = expected.at[1, 1, 4].set(1)  # (1, 0) -> (0, 2)
+    expected = expected.at[2, 2, 5].set(1)  # (0, 1) -> (1, 2)
+    expected = expected.at[3, 3, 0].set(1)  # (1, 1) -> (0, 0)
+    expected = expected.at[4, 4, 1].set(1)  # (0, 2) -> (1, 0)
+    expected = expected.at[5, 5, 2].set(1)  # (1, 2) -> (0, 1)
+    assert jnp.allclose(composite, expected)
 
 
 def test_init():
@@ -112,31 +115,49 @@ def test_init():
     assert jnp.allclose(data.sigma_trans, jnp.array([[0, 0], [0, 1]]))
 
 
-# def test_obs_dist():
-#     """The factored observation distribution should match the product of factor marginals."""
-#     Ts_list = [
-#         jnp.array([zero_one()]),
-#         jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
-#     ]
-#     sigma_emit_list = [
-#         jnp.array([0]),
-#         jnp.array([0, 1]),
-#     ]
-#     sigma_trans_list = [
-#         jnp.array([0]),
-#         jnp.array([0, 1]),
-#     ]
-#     data = init(Ts_list, sigma_emit_list, sigma_trans_list)
-#     eta = jnp.array([...])
-#     weights = mixed_radix_weights(data.Vs)
-#     decode = partial(mixed_radix_decode, Vs=data.Vs, weights=weights)
-#     actual = obs_dist(data, eta, decode=decode)
-#     expected = jnp.array([...])
-#     assert jnp.allclose(actual, expected)
+def test_obs_dist():
+    """The factored observation distribution should use the selected emission variants."""
+    variant0 = jnp.array(zero_one())
+    variant1 = jnp.array(
+        [
+            [
+                [0, 0],
+                [1, 0],
+            ],
+            [
+                [0, 1],
+                [0, 0],
+            ],
+        ]
+    )
+    Ts_list = [
+        jnp.array([zero_one()]),
+        jnp.stack([variant0, variant1]),
+    ]
+    sigma_emit_list = [
+        jnp.array([0]),
+        jnp.array([0, 1]),
+    ]
+    sigma_trans_list = [
+        jnp.array([0]),
+        jnp.array([0, 1]),
+    ]
+    data = init(Ts_list, sigma_emit_list, sigma_trans_list)
+    eta = jnp.array(
+        [
+            [0.8, 0.2],
+            [0.8, 0.2],
+        ]
+    )
+    weights = mixed_radix_weights(data.Vs)
+    decode = partial(mixed_radix_decode, Vs=data.Vs, weights=weights)
+    actual = obs_dist(data, eta, decode=decode)
+    expected = jnp.array([0.64, 0.04, 0.16, 0.16])
+    assert jnp.allclose(actual, expected)
 
 
 def test_generate():
-    """The generate function should return a valid sequence and belief state."""
+    """The generate function should return a valid sequence and runtime belief state."""
     Ts_list = [
         jnp.array([zero_one()]),
         jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
@@ -150,22 +171,32 @@ def test_generate():
         jnp.array([0, 1]),
     ]
     data = init(Ts_list, sigma_emit_list, sigma_trans_list)
+    eta = jnp.array(
+        [
+            [1 / 2, 1 / 2, 0],
+            [1 / 3, 1 / 3, 1 / 3],
+        ]
+    )
+    assert validate_eta(data, eta)
     keys = jax.random.split(jax.random.key(0), 12)
     weights = mixed_radix_weights(data.Vs)
     encode = partial(mixed_radix_encode, weights=weights)
-    eta, xs = jax.jit(generate, static_argnames="encode")(data, data.eta_0, keys, encode=encode)
-    assert eta.shape == (2, 3)
-    assert jnp.allclose(jnp.sum(eta, axis=1), 1)
-    assert eta[0, 2] == 0
-    expected = jnp.array([0, 3, 4, 1, 2, 5, 0, 3, 4, 1, 2, 5])
-    assert jnp.any(jnp.array([jnp.all(jnp.roll(xs, i) == expected) for i in range(6)]))
+    decode = partial(mixed_radix_decode, Vs=data.Vs, weights=weights)
+    eta_final, xs = jax.jit(generate, static_argnames="encode")(data, eta, keys, encode=encode)
+    assert eta_final.shape == (2, 3)
+    assert validate_eta(data, eta_final)
+    assert xs.shape == (12,)
+    xs_factors = jax.vmap(decode)(xs)
+    assert jnp.all(xs_factors[:, 0] < 2)
+    assert jnp.all(xs_factors[:, 1] < 3)
+    assert jnp.all(xs_factors[1:, 0] != xs_factors[:-1, 0])
 
 
 def test_seq_prob():
-    """The sequence probability should be correct."""
+    """The sequence probability should use the explicit runtime initial state."""
     Ts_list = [
         jnp.array([zero_one()]),
-        jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
+        jnp.array([cycle(3, 1.0), cycle(3, 1.0)]),
     ]
     sigma_emit_list = [
         jnp.array([0]),
@@ -177,8 +208,14 @@ def test_seq_prob():
     ]
     assert validate(Ts_list, sigma_emit_list, sigma_trans_list)
     data = init(Ts_list, sigma_emit_list, sigma_trans_list)
+    eta = jnp.array(
+        [
+            [1 / 2, 1 / 2, 0],
+            [1 / 3, 1 / 3, 1 / 3],
+        ]
+    )
     xs = jnp.array([0, 3, 4, 1, 2, 5])
     weights = mixed_radix_weights(data.Vs)
     decode = partial(mixed_radix_decode, Vs=data.Vs, weights=weights)
-    actual = jax.jit(seq_prob, static_argnames="decode")(data, xs, decode=decode)
+    actual = jax.jit(seq_prob, static_argnames="decode")(data, eta, xs, decode=decode)
     assert jnp.isclose(actual, 1 / 6)

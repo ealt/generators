@@ -31,13 +31,13 @@ def validate(Ts_list: list[jax.Array]) -> bool:
     return len(Ts_list) > 0 and all(validate_factor(Ts) for Ts in Ts_list)
 
 
-def compile_matrices(Ts_list: list[jax.Array]) -> jax.Array:
+def compile(Ts_list: list[jax.Array]) -> jax.Array:
     """Compile a list of independent transition matrices into a single transition matrix."""
     matrices = []
     factor_vocabs = [range(Ts.shape[0]) for Ts in Ts_list]
-    for xs_rev in itertools.product(*reversed(factor_vocabs)):
-        xs = tuple(reversed(xs_rev))
-        factors = [Ts[int(x_i)] for Ts, x_i in zip(Ts_list, xs, strict=True)]
+    for x_factors_rev in itertools.product(*reversed(factor_vocabs)):
+        x_factors = tuple(reversed(x_factors_rev))
+        factors = [Ts[int(x_i)] for Ts, x_i in zip(Ts_list, x_factors, strict=True)]
         composite = factors[-1]
         for factor in reversed(factors[:-1]):
             composite = jnp.kron(composite, factor)
@@ -67,8 +67,8 @@ def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Ar
     factor_ids = jnp.arange(factor_dists.shape[0])
 
     def obs_prob(x: jax.Array) -> jax.Array:
-        factor_xs = decode(x)
-        factor_probs = factor_dists[factor_ids, factor_xs]
+        x_factors = decode(x)
+        factor_probs = factor_dists[factor_ids, x_factors]
         return jnp.prod(factor_probs)
 
     obs = jnp.arange(data.V)
@@ -86,14 +86,14 @@ def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
     return jax.vmap(sample_factor, in_axes=0)(factor_data, eta, keys)
 
 
-def update(data: Data, eta: jax.Array, factor_xs: jax.Array) -> jax.Array:
+def update(data: Data, eta: jax.Array, x_factors: jax.Array) -> jax.Array:
     """Compute the belief updates of a factored process.
 
-    Pass component observations as xs.
+    Pass per-factor observations as `x_factors`.
     May require decoding a composite observation as a prerequisite.
     """
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
-    return jax.vmap(update_factor, in_axes=0)(factor_data, eta, factor_xs)
+    return jax.vmap(update_factor, in_axes=0)(factor_data, eta, x_factors)
 
 
 def generate(
@@ -109,25 +109,25 @@ def generate(
     """
 
     def step(eta, key):
-        factor_xs = sample(data, eta, key)
-        x = encode(factor_xs)
-        return update(data, eta, factor_xs), x
+        x_factors = sample(data, eta, key)
+        x = encode(x_factors)
+        return update(data, eta, x_factors), x
 
     return jax.lax.scan(step, eta, keys)
 
 
 def seq_prob(data: Data, xs: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
     """Compute the sequence probability of an independent factored process."""
-    factor_xs = jax.vmap(decode)(xs)
+    xs_factors = jax.vmap(decode)(xs)
 
     def unnorm_update_factor(Ts_i: jax.Array, eta_i: jax.Array, x_i: jax.Array) -> jax.Array:
         return eta_i @ Ts_i[x_i]
 
-    def unnorm_update(eta: jax.Array, factor_xs: jax.Array) -> tuple[jax.Array, None]:
-        next_eta = jax.vmap(unnorm_update_factor, in_axes=(0, 0, 0))(data.Ts, eta, factor_xs)
+    def unnorm_update(eta: jax.Array, x_factors: jax.Array) -> tuple[jax.Array, None]:
+        next_eta = jax.vmap(unnorm_update_factor, in_axes=(0, 0, 0))(data.Ts, eta, x_factors)
         return next_eta, None
 
-    eta, _ = jax.lax.scan(unnorm_update, init=data.eta_0, xs=factor_xs)
+    eta, _ = jax.lax.scan(unnorm_update, init=data.eta_0, xs=xs_factors)
 
     def factor_seq_prob(eta_i: jax.Array, w_i: jax.Array) -> jax.Array:
         return eta_i @ w_i
