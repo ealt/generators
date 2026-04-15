@@ -18,7 +18,6 @@ from tests.transition_matrices import cycle, zero_one
 
 
 def test_compile():
-    """Single-selector chains should compile into the expected composite operators."""
     Ts_list = [
         jnp.array([zero_one()]),
         jnp.array([cycle(3, 1.0), cycle(3, 0.0)]),
@@ -41,7 +40,6 @@ def test_compile():
 
 
 def test_init():
-    """The init function should return a valid data object."""
     Ts_list = [
         jnp.array([zero_one()]),
         jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
@@ -116,7 +114,6 @@ def test_init():
 
 
 def test_obs_dist():
-    """The factored observation distribution should use the selected emission variants."""
     variant0 = jnp.array(zero_one())
     variant1 = jnp.array(
         [
@@ -157,7 +154,6 @@ def test_obs_dist():
 
 
 def test_generate():
-    """The generate function should return a valid sequence and runtime belief state."""
     Ts_list = [
         jnp.array([zero_one()]),
         jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
@@ -193,7 +189,6 @@ def test_generate():
 
 
 def test_seq_prob():
-    """The sequence probability should use the explicit runtime initial state."""
     Ts_list = [
         jnp.array([zero_one()]),
         jnp.array([cycle(3, 1.0), cycle(3, 1.0)]),

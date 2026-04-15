@@ -50,7 +50,15 @@ convention = "google"
 # Disable line-too-long check since ruff handles line length (120 chars)
 # C0103 invalid-name: naming convention (variables, etc.)
 # W0622 redefined-builtin: allow names like "compile" in project APIs
-disable = ["line-too-long", "duplicate-code", "invalid-name", "redefined-builtin"]
+disable = [
+    "line-too-long",
+    "duplicate-code",
+    "invalid-name",
+    "redefined-builtin",
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+]
 
 [tool.pyright]
 typeCheckingMode = "standard"

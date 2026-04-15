@@ -17,7 +17,6 @@ from tests.transition_matrices import cycle, zero_one
 
 
 def test_compile():
-    """Independent factors should compile into a single valid GHMM."""
     Ts_list = [
         jnp.array(zero_one()),
         jnp.array(cycle(3, 1.0)),
@@ -56,7 +55,6 @@ def test_init():
 
 
 def test_obs_dist():
-    """The factored observation distribution should match the product of factor marginals."""
     Ts_list = [
         jnp.array(zero_one()),
         jnp.array(cycle(3, 1.0)),
@@ -71,7 +69,6 @@ def test_obs_dist():
 
 
 def test_generate():
-    """The generate function should return a valid sequence and belief state."""
     Ts_list = [
         jnp.array(zero_one()),
         jnp.array(cycle(3, 1.0)),
@@ -90,7 +87,6 @@ def test_generate():
 
 
 def test_seq_prob():
-    """The sequence probability should be correct."""
     Ts_list = [
         jnp.array(zero_one()),
         jnp.array(cycle(3, 1.0)),

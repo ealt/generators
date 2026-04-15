@@ -1,5 +1,4 @@
 def mess3(x: float, a: float) -> list[list[list[float]]]:
-    """Creates a transition matrix for the Mess3 Process."""
     b = (1 - a) / 2
     y = 1 - 2 * x
 
@@ -28,7 +27,6 @@ def mess3(x: float, a: float) -> list[list[list[float]]]:
 
 
 def zero_one() -> list[list[list[float]]]:
-    """Generate the transition matrices for a zero-one process."""
     return [
         [
             [0, 1],
@@ -42,7 +40,6 @@ def zero_one() -> list[list[list[float]]]:
 
 
 def zero_one_random(p: float) -> list[list[list[float]]]:
-    """Generate the transition matrices for a zero-one random process."""
     q = 1 - p
     return [
         [
@@ -59,7 +56,6 @@ def zero_one_random(p: float) -> list[list[list[float]]]:
 
 
 def cycle(n: int, p: float) -> list[list[list[float]]]:
-    """Generate the transition matrices for a cycle process."""
     assert n >= 3
     q = 1 - p
     Ts: list[list[list[float]]] = [[[0.0 for _ in range(n)] for _ in range(n)] for _ in range(n)]

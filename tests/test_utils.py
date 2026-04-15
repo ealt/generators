@@ -4,7 +4,6 @@ from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weight
 
 
 def test_principal_ev():
-    """Principal eigenvector should be the same as the eigenvector with the largest eigenvalue."""
     T = jnp.array(
         [
             [14, -6],
@@ -17,7 +16,6 @@ def test_principal_ev():
 
 
 def test_stack():
-    """Stacking should pad arrays to the same shape."""
     arrs = [jnp.ones((1, 1, 2)), jnp.ones((1, 2, 1)), jnp.ones((2, 1, 1))]
     expected = jnp.array(
         [
@@ -58,7 +56,6 @@ def test_stack():
 
 
 def test_mixed_radix_decode_encode():
-    """Mixed-radix decoding and encoding should invert exactly."""
     Vs = jnp.array([2, 3, 2])
     weights = mixed_radix_weights(Vs)
 

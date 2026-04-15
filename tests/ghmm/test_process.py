@@ -6,7 +6,6 @@ from tests.transition_matrices import zero_one_random
 
 
 def test_init():
-    """Test the generate function."""
     Ts = jnp.array(zero_one_random(0.5))
     assert validate(Ts)
     data = init(Ts)
@@ -16,7 +15,6 @@ def test_init():
 
 
 def test_generate():
-    """Test the generate function."""
     Ts = jnp.array(zero_one_random(0.5))
     data = init(Ts)
     keys = jax.random.split(jax.random.key(0), 12)
@@ -31,7 +29,6 @@ def test_generate():
 
 
 def test_seq_prob():
-    """Test the generate function."""
     Ts = jnp.array(zero_one_random(0.5))
     data = init(Ts)
     xs = jnp.array([1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0])

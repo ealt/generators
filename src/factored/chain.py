@@ -1,5 +1,3 @@
-"""Factored process."""
-
 import itertools
 from collections.abc import Callable
 from typing import Any, NamedTuple
@@ -16,8 +14,6 @@ from src.utils import stack
 
 
 class Data(NamedTuple):
-    """Typed dictionary."""
-
     Ts: jax.Array
     eta_0: jax.Array
     w: jax.Array
@@ -30,7 +26,6 @@ class Data(NamedTuple):
 
 
 def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> bool:
-    """Validate the data."""
     if not len(Ts_list) > 0:
         return False
     Ks = jnp.array([Ts_i.shape[0] for Ts_i in Ts_list])
@@ -61,7 +56,6 @@ def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_t
 
 
 def compile(Ts_list: list[jax.Array], sigma_list: list[jax.Array]) -> jax.Array:
-    """Compile a single-selector sequential chain into a single GHMM transition tensor."""
     matrices = []
     vocabs = [range(Ts_i.shape[1]) for Ts_i in Ts_list]
     for x_factors_rev in itertools.product(*reversed(vocabs)):
@@ -80,7 +74,6 @@ def compile(Ts_list: list[jax.Array], sigma_list: list[jax.Array]) -> jax.Array:
 
 
 def init(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> Data:
-    """Initialize the data of a factored process."""
     Ts = stack(Ts_list)
     factors = [jax.vmap(init_variant)(Ts_i) for Ts_i in Ts_list]
     eta_0 = stack([factor.eta_0 for factor in factors])
@@ -95,7 +88,6 @@ def init(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans
 
 
 def validate_eta(data: Data, eta: jax.Array) -> bool:
-    """Validate a runtime factor-state array against the shared factor state spaces."""
     if eta.ndim != 2:
         return False
     if eta.shape != (data.Ts.shape[0], data.Ts.shape[-1]):
@@ -111,7 +103,6 @@ def validate_eta(data: Data, eta: jax.Array) -> bool:
 
 
 def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
-    """Compute the observation distribution of a factored process."""
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
 
     def obs_prob(x: jax.Array) -> jax.Array:
@@ -136,12 +127,6 @@ def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Ar
 
 
 def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
-    """Sample a token from a factored process.
-
-    Returns:
-        tuple[jax.Array, jax.Array]: The composite token and the component tokens.
-    """
-
     def sample_factor(
         x_prev: jax.Array, args: tuple[FactorData, jax.Array, jax.Array, jax.Array]
     ) -> tuple[jax.Array, jax.Array]:
@@ -160,8 +145,6 @@ def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
 
 
 def update(data: Data, eta: jax.Array, x_factors: jax.Array) -> jax.Array:
-    """Compute the belief updates of a factored process."""
-
     def update_factor(
         factor_i: FactorData, sigma_trans_i: jax.Array, x_prev: jax.Array, eta_i: jax.Array, x_i: jax.Array
     ) -> jax.Array:
@@ -182,8 +165,6 @@ def generate(
     *,
     encode: Callable[[jax.Array], jax.Array],
 ) -> tuple[jax.Array, jax.Array]:
-    """Generate a sequence of tokens from a factored process."""
-
     def step(eta, key):
         x_factors = sample(data, eta, key)
         x = encode(x_factors)
@@ -193,8 +174,6 @@ def generate(
 
 
 def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
-    """Compute the sequence probability of a factored process."""
-
     def unnorm_update_factor(
         Ts_i: jax.Array,
         w_i: jax.Array,
