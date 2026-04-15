@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from src.factored.chain import (
+    compile_matrices,
     generate,
     init,
     obs_dist,
@@ -11,27 +12,32 @@ from src.factored.chain import (
     validate,
     validate_eta,
 )
+from src.ghmm.process import validate as validate_ghmm
 from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
 from tests.transition_matrices import cycle, zero_one
 
-# def test_compile():
-#     """Independent factors should compile into a single valid GHMM."""
-#     Ts_list = [
-#         jnp.array(zero_one()),
-#         jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
-#     ]
-#     sigma_emit_list = [
-#         jnp.array([0]),
-#         jnp.array([0, 1]),
-#     ]
-#     sigma_trans_list = [
-#         jnp.array([0]),
-#         jnp.array([0, 1]),
-#     ]
-#     composite = compile_matrices(Ts_list, sigma_emit_list, sigma_trans_list)
-#     assert validate_ghmm(composite)
-#     expected = jnp.array([...])
-#     assert jnp.allclose(composite, expected)
+
+def test_compile():
+    """Single-selector chains should compile into the expected composite operators."""
+    Ts_list = [
+        jnp.array([zero_one()]),
+        jnp.array([cycle(3, 1.0), cycle(3, 0.0)]),
+    ]
+    sigma_list = [
+        jnp.array([0]),
+        jnp.array([0, 1]),
+    ]
+
+    composite = compile_matrices(Ts_list, sigma_list)
+    assert validate_ghmm(composite)
+    expected = jnp.zeros((6, 6, 6))
+    expected = expected.at[0, 0, 3].set(1)  # (0, 0) -> (1, 1)
+    expected = expected.at[1, 1, 4].set(1)  # (1, 0) -> (0, 2)
+    expected = expected.at[2, 2, 5].set(1)  # (0, 1) -> (1, 2)
+    expected = expected.at[3, 3, 0].set(1)  # (1, 1) -> (0, 0)
+    expected = expected.at[4, 4, 1].set(1)  # (0, 2) -> (1, 0)
+    expected = expected.at[5, 5, 2].set(1)  # (1, 2) -> (0, 1)
+    assert jnp.allclose(composite, expected)
 
 
 def test_init():

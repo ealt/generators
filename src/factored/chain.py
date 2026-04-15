@@ -1,5 +1,6 @@
 """Factored process."""
 
+import itertools
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
@@ -59,11 +60,23 @@ def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_t
     return validate_sigma(sigma_emit_list) and validate_sigma(sigma_trans_list)
 
 
-def compile_matrices(
-    Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]
-) -> jax.Array:
-    """Compile a list of transition matrices into a single transition matrix."""
-    ...  # TODO: implement this
+def compile_matrices(Ts_list: list[jax.Array], sigma_list: list[jax.Array]) -> jax.Array:
+    """Compile a single-selector sequential chain into a single GHMM transition tensor."""
+    matrices = []
+    vocabs = [range(Ts_i.shape[1]) for Ts_i in Ts_list]
+    for x_factors_rev in itertools.product(*reversed(vocabs)):
+        x_factors = tuple(reversed(x_factors_rev))
+        x_prev = 0
+        factors = []
+        for Ts_i, sigma_i, x_i in zip(Ts_list, sigma_list, x_factors, strict=True):
+            k_i = int(sigma_i[x_prev])
+            factors.append(Ts_i[k_i, int(x_i)])
+            x_prev = int(x_i)
+        composite = factors[-1]
+        for factor in reversed(factors[:-1]):
+            composite = jnp.kron(composite, factor)
+        matrices.append(composite)
+    return jnp.stack(matrices)
 
 
 def init(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> Data:
