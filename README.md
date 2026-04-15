@@ -1,3 +1,3 @@
-# Generative Processes
+# Generators
 
 simple, efficient, hackable
