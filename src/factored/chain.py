@@ -81,9 +81,45 @@ def init(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans
     return Data(Ts=Ts, eta_0=eta_0, w=w, Ks=Ks, Vs=Vs, Ss=Ss, V=V, sigma_emit=sigma_emit, sigma_trans=sigma_trans)
 
 
+def validate_eta(data: Data, eta: jax.Array) -> bool:
+    """Validate a runtime factor-state array against the shared factor state spaces."""
+    if eta.ndim != 2:
+        return False
+    if eta.shape != (data.Ts.shape[0], data.Ts.shape[-1]):
+        return False
+    if not jnp.all(jnp.isfinite(eta)):
+        return False
+    if not jnp.all(eta >= 0):
+        return False
+    return all(
+        jnp.any(eta_i[: int(S_i)] > 0) and jnp.all(eta_i[int(S_i) :] == 0)
+        for eta_i, S_i in zip(eta, data.Ss, strict=True)
+    )
+
+
 def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
     """Compute the observation distribution of a factored process."""
-    ...  # TODO: implement this
+    factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
+
+    def obs_prob(x: jax.Array) -> jax.Array:
+        factor_xs = decode(x)
+
+        def factor_prob(
+            x_prev: jax.Array, args: tuple[FactorData, jax.Array, jax.Array, jax.Array]
+        ) -> tuple[jax.Array, jax.Array]:
+            factor_i, sigma_emit_i, eta_i, x_i = args
+            k_i = sigma_emit_i[x_prev]
+            variant_Ts = factor_i.Ts[k_i]
+            variant_w = factor_i.w[k_i]
+            prob = (eta_i @ variant_Ts[x_i] @ variant_w) / (eta_i @ variant_w)
+            return x_i, prob
+
+        scan_xs: Any = (factor_data, data.sigma_emit, eta, factor_xs)
+        _, probs = jax.lax.scan(factor_prob, jnp.array(0), scan_xs)
+        return jnp.prod(probs)
+
+    obs = jnp.arange(data.V)
+    return jax.vmap(obs_prob, in_axes=0)(obs)
 
 
 def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
@@ -143,6 +179,34 @@ def generate(
     return jax.lax.scan(step, eta, keys)
 
 
-def seq_prob(data: Data, xs: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
+def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
     """Compute the sequence probability of a factored process."""
-    ...  # TODO: implement this
+
+    def unnorm_update_factor(
+        factor_i: FactorData,
+        sigma_emit_i: jax.Array,
+        sigma_trans_i: jax.Array,
+        x_prev_i: jax.Array,
+        eta_i: jax.Array,
+        x_i: jax.Array,
+    ) -> tuple[jax.Array, jax.Array]:
+        k_emit_i = sigma_emit_i[x_prev_i]
+        emit_variant = FactorData(Ts=factor_i.Ts[k_emit_i], eta_0=factor_i.eta_0[k_emit_i], w=factor_i.w[k_emit_i])
+        prob = (eta_i @ emit_variant.Ts[x_i] @ emit_variant.w) / (eta_i @ emit_variant.w)
+
+        k_trans_i = sigma_trans_i[x_prev_i]
+        trans_variant = FactorData(Ts=factor_i.Ts[k_trans_i], eta_0=factor_i.eta_0[k_trans_i], w=factor_i.w[k_trans_i])
+        next_eta = eta_i @ trans_variant.Ts[x_i]
+        return next_eta, prob
+
+    factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
+
+    def step(eta: jax.Array, xs_t: jax.Array) -> tuple[jax.Array, jax.Array]:
+        xs_prev = jnp.roll(xs_t, 1).at[0].set(0)
+        vmap_args: Any = (factor_data, data.sigma_emit, data.sigma_trans, xs_prev, eta, xs_t)
+        next_eta, probs = jax.vmap(unnorm_update_factor, in_axes=0)(*vmap_args)
+        return next_eta, jnp.prod(probs)
+
+    factor_xs = jax.vmap(decode)(xs)
+    _, probs = jax.lax.scan(step, eta, factor_xs)
+    return jnp.prod(probs)
