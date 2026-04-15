@@ -336,6 +336,10 @@ Except in the $Z = 0$ fallback branch of §4.6.3, a factor update denominator of
 
 When the selected variant changes, the factor state is carried forward directly in the common factor coordinate system. If two variants have different normalizing eigenvectors, the same concrete row vector may be canonical for one variant gauge and non-canonical for another. This is valid in v1.0; canonical normalization is always relative to the variant whose $\mathbf{w}_{i \mid k}$ is being used in the current formula.
 
+The runtime state of a factored process therefore contains a single current factor-state representative $\boldsymbol{\eta}^i$ for each factor $i$, not one current state per variant. Selectors determine which variant's local process parameters are applied to that shared factor state at a given step; they do not replace the factor state with a variant-specific default state.
+
+A valid runtime factor-state representative for factor $i$ is any finite, nonzero, nonnegative row vector in that factor's shared state space. In padded implementations, entries outside the true $S_i$ coordinates must be zero. Generic runtime-state validity does not require canonical normalization, because canonicality is defined only relative to the selected variant's normalizing eigenvector.
+
 ### 4.3 Observation probability distribution
 
 The observation law of a factored process is a joint distribution over composite tokens, assembled from per-factor emission distributions according to the chosen emission dependency scheme.
