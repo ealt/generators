@@ -2,13 +2,17 @@
 
 Simple over complex.
 
+Brevity over verbosity.
+
 Composable over monolithic.
 
 Local over distributed.
 
-Brevity over verbosity.
+Eschew excess documentation.
 
-Make every LOC count.
+Eschew dependencies.
+
+Modules, not a package.
 
 Some assembly required.
 
