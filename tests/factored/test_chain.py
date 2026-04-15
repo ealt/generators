@@ -180,10 +180,10 @@ def test_generate():
     assert eta_final.shape == (2, 3)
     assert validate_eta(data, eta_final)
     assert xs.shape == (12,)
-    factor_xs = jax.vmap(decode)(xs)
-    assert jnp.all(factor_xs[:, 0] < 2)
-    assert jnp.all(factor_xs[:, 1] < 3)
-    assert jnp.all(factor_xs[1:, 0] != factor_xs[:-1, 0])
+    xs_factors = jax.vmap(decode)(xs)
+    assert jnp.all(xs_factors[:, 0] < 2)
+    assert jnp.all(xs_factors[:, 1] < 3)
+    assert jnp.all(xs_factors[1:, 0] != xs_factors[:-1, 0])
 
 
 def test_seq_prob():

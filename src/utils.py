@@ -33,11 +33,11 @@ def mixed_radix_weights(Vs: jax.Array) -> jax.Array:
     return jnp.roll(jnp.cumprod(Vs), 1).at[0].set(1)
 
 
-def mixed_radix_encode(xs: jax.Array, *, weights: jax.Array) -> jax.Array:
-    """Encode local tokens into a global token using little-endian mixed radix."""
-    return jnp.sum(xs * weights)
+def mixed_radix_encode(x_factors: jax.Array, *, weights: jax.Array) -> jax.Array:
+    """Encode per-factor tokens into a composite token using little-endian mixed radix."""
+    return jnp.sum(x_factors * weights)
 
 
 def mixed_radix_decode(x: jax.Array, *, Vs: jax.Array, weights: jax.Array) -> jax.Array:
-    """Decode a global token into local tokens using little-endian mixed radix."""
+    """Decode a composite token into per-factor tokens using little-endian mixed radix."""
     return (x // weights) % Vs

@@ -102,7 +102,7 @@ def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Ar
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
 
     def obs_prob(x: jax.Array) -> jax.Array:
-        factor_xs = decode(x)
+        x_factors = decode(x)
 
         def factor_prob(
             x_prev: jax.Array, args: tuple[FactorData, jax.Array, jax.Array, jax.Array]
@@ -114,8 +114,8 @@ def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Ar
             prob = (eta_i @ variant_Ts[x_i] @ variant_w) / (eta_i @ variant_w)
             return x_i, prob
 
-        scan_xs: Any = (factor_data, data.sigma_emit, eta, factor_xs)
-        _, probs = jax.lax.scan(factor_prob, jnp.array(0), scan_xs)
+        scan_inputs: Any = (factor_data, data.sigma_emit, eta, x_factors)
+        _, probs = jax.lax.scan(factor_prob, jnp.array(0), scan_inputs)
         return jnp.prod(probs)
 
     obs = jnp.arange(data.V)
@@ -133,32 +133,32 @@ def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
         x_prev: jax.Array, args: tuple[FactorData, jax.Array, jax.Array, jax.Array]
     ) -> tuple[jax.Array, jax.Array]:
         factor_i, sigma_emit_i, eta_i, key_i = args
-        K_i = sigma_emit_i[x_prev]
-        variant = FactorData(Ts=factor_i.Ts[K_i], eta_0=factor_i.eta_0[K_i], w=factor_i.w[K_i])
+        k_i = sigma_emit_i[x_prev]
+        variant = FactorData(Ts=factor_i.Ts[k_i], eta_0=factor_i.eta_0[k_i], w=factor_i.w[k_i])
         x = sample_variant(variant, eta_i, key_i)
         return x, x
 
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
     num_factors = int(data.Ts.shape[0])
     keys = jax.random.split(key, num_factors)
-    scan_xs: Any = (factor_data, data.sigma_emit, eta, keys)
-    _, factor_xs = jax.lax.scan(sample_factor, jnp.array(0), scan_xs)
-    return factor_xs
+    scan_inputs: Any = (factor_data, data.sigma_emit, eta, keys)
+    _, x_factors = jax.lax.scan(sample_factor, jnp.array(0), scan_inputs)
+    return x_factors
 
 
-def update(data: Data, eta: jax.Array, factor_xs: jax.Array) -> jax.Array:
+def update(data: Data, eta: jax.Array, x_factors: jax.Array) -> jax.Array:
     """Compute the belief updates of a factored process."""
 
     def update_factor(
-        factor_i: FactorData, sigma_trans_i: jax.Array, x_prev_i: jax.Array, eta_i: jax.Array, xs_i: jax.Array
+        factor_i: FactorData, sigma_trans_i: jax.Array, x_prev: jax.Array, eta_i: jax.Array, x_i: jax.Array
     ) -> jax.Array:
-        K_i = sigma_trans_i[x_prev_i]
-        variant = FactorData(Ts=factor_i.Ts[K_i], eta_0=factor_i.eta_0[K_i], w=factor_i.w[K_i])
-        return update_variant(variant, eta_i, xs_i)
+        k_i = sigma_trans_i[x_prev]
+        variant = FactorData(Ts=factor_i.Ts[k_i], eta_0=factor_i.eta_0[k_i], w=factor_i.w[k_i])
+        return update_variant(variant, eta_i, x_i)
 
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
-    xs_prev = jnp.roll(factor_xs, 1).at[0].set(0)
-    vmap_args: Any = (factor_data, data.sigma_trans, xs_prev, eta, factor_xs)
+    x_factors_prev = jnp.roll(x_factors, 1).at[0].set(0)
+    vmap_args: Any = (factor_data, data.sigma_trans, x_factors_prev, eta, x_factors)
     return jax.vmap(update_factor, in_axes=0)(*vmap_args)
 
 
@@ -172,9 +172,9 @@ def generate(
     """Generate a sequence of tokens from a factored process."""
 
     def step(eta, key):
-        factor_xs = sample(data, eta, key)
-        x = encode(factor_xs)
-        return update(data, eta, factor_xs), x
+        x_factors = sample(data, eta, key)
+        x = encode(x_factors)
+        return update(data, eta, x_factors), x
 
     return jax.lax.scan(step, eta, keys)
 
@@ -186,27 +186,27 @@ def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax
         factor_i: FactorData,
         sigma_emit_i: jax.Array,
         sigma_trans_i: jax.Array,
-        x_prev_i: jax.Array,
+        x_prev: jax.Array,
         eta_i: jax.Array,
         x_i: jax.Array,
     ) -> tuple[jax.Array, jax.Array]:
-        k_emit_i = sigma_emit_i[x_prev_i]
+        k_emit_i = sigma_emit_i[x_prev]
         emit_variant = FactorData(Ts=factor_i.Ts[k_emit_i], eta_0=factor_i.eta_0[k_emit_i], w=factor_i.w[k_emit_i])
         prob = (eta_i @ emit_variant.Ts[x_i] @ emit_variant.w) / (eta_i @ emit_variant.w)
 
-        k_trans_i = sigma_trans_i[x_prev_i]
+        k_trans_i = sigma_trans_i[x_prev]
         trans_variant = FactorData(Ts=factor_i.Ts[k_trans_i], eta_0=factor_i.eta_0[k_trans_i], w=factor_i.w[k_trans_i])
         next_eta = eta_i @ trans_variant.Ts[x_i]
         return next_eta, prob
 
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
 
-    def step(eta: jax.Array, xs_t: jax.Array) -> tuple[jax.Array, jax.Array]:
-        xs_prev = jnp.roll(xs_t, 1).at[0].set(0)
-        vmap_args: Any = (factor_data, data.sigma_emit, data.sigma_trans, xs_prev, eta, xs_t)
+    def step(eta: jax.Array, x_factors: jax.Array) -> tuple[jax.Array, jax.Array]:
+        x_factors_prev = jnp.roll(x_factors, 1).at[0].set(0)
+        vmap_args: Any = (factor_data, data.sigma_emit, data.sigma_trans, x_factors_prev, eta, x_factors)
         next_eta, probs = jax.vmap(unnorm_update_factor, in_axes=0)(*vmap_args)
         return next_eta, jnp.prod(probs)
 
-    factor_xs = jax.vmap(decode)(xs)
-    _, probs = jax.lax.scan(step, eta, factor_xs)
+    xs_factors = jax.vmap(decode)(xs)
+    _, probs = jax.lax.scan(step, eta, xs_factors)
     return jnp.prod(probs)
