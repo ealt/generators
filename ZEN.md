@@ -1,5 +1,7 @@
 # Zen
 
+Human crafted.
+
 Simple over complex.
 
 Brevity over verbosity.
@@ -20,4 +22,4 @@ Trust the user.
 
 Vectorize where possible.
 
-JIT enable the hot loop.
+JIT the hot loop.
