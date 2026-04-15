@@ -183,7 +183,8 @@ def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax
     """Compute the sequence probability of a factored process."""
 
     def unnorm_update_factor(
-        factor_i: FactorData,
+        Ts_i: jax.Array,
+        w_i: jax.Array,
         sigma_emit_i: jax.Array,
         sigma_trans_i: jax.Array,
         x_prev: jax.Array,
@@ -191,19 +192,18 @@ def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax
         x_i: jax.Array,
     ) -> tuple[jax.Array, jax.Array]:
         k_emit_i = sigma_emit_i[x_prev]
-        emit_variant = FactorData(Ts=factor_i.Ts[k_emit_i], eta_0=factor_i.eta_0[k_emit_i], w=factor_i.w[k_emit_i])
-        prob = (eta_i @ emit_variant.Ts[x_i] @ emit_variant.w) / (eta_i @ emit_variant.w)
+        emit_Ts_i = Ts_i[k_emit_i]
+        emit_w_i = w_i[k_emit_i]
+        prob = (eta_i @ emit_Ts_i[x_i] @ emit_w_i) / (eta_i @ emit_w_i)
 
         k_trans_i = sigma_trans_i[x_prev]
-        trans_variant = FactorData(Ts=factor_i.Ts[k_trans_i], eta_0=factor_i.eta_0[k_trans_i], w=factor_i.w[k_trans_i])
-        next_eta = eta_i @ trans_variant.Ts[x_i]
+        trans_Ts_i = Ts_i[k_trans_i]
+        next_eta = eta_i @ trans_Ts_i[x_i]
         return next_eta, prob
-
-    factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
 
     def step(eta: jax.Array, x_factors: jax.Array) -> tuple[jax.Array, jax.Array]:
         x_factors_prev = jnp.roll(x_factors, 1).at[0].set(0)
-        vmap_args: Any = (factor_data, data.sigma_emit, data.sigma_trans, x_factors_prev, eta, x_factors)
+        vmap_args: Any = (data.Ts, data.w, data.sigma_emit, data.sigma_trans, x_factors_prev, eta, x_factors)
         next_eta, probs = jax.vmap(unnorm_update_factor, in_axes=0)(*vmap_args)
         return next_eta, jnp.prod(probs)
 
