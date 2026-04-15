@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from src.ghmm.process import Data as FactorData
-from src.ghmm.process import init as init_factor
+from src.ghmm.process import init as init_variant
 from src.ghmm.process import sample as sample_variant
 from src.ghmm.process import update as update_variant
 from src.ghmm.process import validate as validate_variant
@@ -68,13 +68,13 @@ def compile_matrices(
 
 def init(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> Data:
     """Initialize the data of a factored process."""
-    factors = [init_factor(Ts[0]) for Ts in Ts_list]
-    Ts = stack([factor.Ts for factor in factors])
+    Ts = stack(Ts_list)
+    factors = [jax.vmap(init_variant)(Ts_i) for Ts_i in Ts_list]
     eta_0 = stack([factor.eta_0 for factor in factors])
     w = stack([factor.w for factor in factors])
-    Ks = jnp.array([Ts.shape[0] for Ts in Ts_list])
-    Vs = jnp.array([Ts.shape[1] for Ts in Ts_list])
-    Ss = jnp.array([Ts.shape[2] for Ts in Ts_list])
+    Ks = jnp.array([Ts_i.shape[0] for Ts_i in Ts_list])
+    Vs = jnp.array([Ts_i.shape[1] for Ts_i in Ts_list])
+    Ss = jnp.array([Ts_i.shape[2] for Ts_i in Ts_list])
     V = int(jnp.prod(Vs))
     sigma_emit = stack(sigma_emit_list)
     sigma_trans = stack(sigma_trans_list)
@@ -97,7 +97,7 @@ def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
         x_prev: jax.Array, args: tuple[FactorData, jax.Array, jax.Array, jax.Array]
     ) -> tuple[jax.Array, jax.Array]:
         factor_i, sigma_emit_i, eta_i, key_i = args
-        K_i = sigma_emit_i[x_prev].item()
+        K_i = sigma_emit_i[x_prev]
         variant = FactorData(Ts=factor_i.Ts[K_i], eta_0=factor_i.eta_0[K_i], w=factor_i.w[K_i])
         x = sample_variant(variant, eta_i, key_i)
         return x, x
@@ -114,15 +114,15 @@ def update(data: Data, eta: jax.Array, factor_xs: jax.Array) -> jax.Array:
     """Compute the belief updates of a factored process."""
 
     def update_factor(
-        factor_i: FactorData, sigma_emit_i: jax.Array, x_prev_i: jax.Array, eta_i: jax.Array, xs_i: jax.Array
+        factor_i: FactorData, sigma_trans_i: jax.Array, x_prev_i: jax.Array, eta_i: jax.Array, xs_i: jax.Array
     ) -> jax.Array:
-        K_i = sigma_emit_i[x_prev_i].item()
+        K_i = sigma_trans_i[x_prev_i]
         variant = FactorData(Ts=factor_i.Ts[K_i], eta_0=factor_i.eta_0[K_i], w=factor_i.w[K_i])
         return update_variant(variant, eta_i, xs_i)
 
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
     xs_prev = jnp.roll(factor_xs, 1).at[0].set(0)
-    vmap_args: Any = (factor_data, data.sigma_emit, xs_prev, eta, factor_xs)
+    vmap_args: Any = (factor_data, data.sigma_trans, xs_prev, eta, factor_xs)
     return jax.vmap(update_factor, in_axes=0)(*vmap_args)
 
 
