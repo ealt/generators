@@ -146,6 +146,7 @@ def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Ar
 
 
 def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
+
     def sample_factor(
         prefix: jax.Array, args: tuple[FactorData, jax.Array, jax.Array, jax.Array, jax.Array]
     ) -> tuple[jax.Array, jax.Array]:
@@ -169,7 +170,11 @@ def update(data: Data, eta: jax.Array, x_factors: jax.Array) -> jax.Array:
     prefix_terms = x_factors * data.weights
     prefix = jnp.cumsum(prefix_terms) - prefix_terms
     k = data.sigma_trans[factor_ids, prefix]
-    variant_data = FactorData(Ts=data.Ts[factor_ids, k], eta_0=data.eta_0[factor_ids, k], w=data.w[factor_ids, k])
+    variant_data = FactorData(
+        Ts=data.Ts[factor_ids, k],
+        eta_0=data.eta_0[factor_ids, k],
+        w=data.w[factor_ids, k],
+    )
     return jax.vmap(update_variant, in_axes=0)(variant_data, eta, x_factors)
 
 
@@ -180,6 +185,7 @@ def generate(
     *,
     encode: Callable[[jax.Array], jax.Array],
 ) -> tuple[jax.Array, jax.Array]:
+
     def step(eta, key):
         x_factors = sample(data, eta, key)
         x = encode(x_factors)
@@ -189,12 +195,8 @@ def generate(
 
 
 def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
+
     def step(eta: jax.Array, x_factors: jax.Array) -> tuple[jax.Array, jax.Array]:
-        factor_ids = jnp.arange(data.Ts.shape[0])
-        prefix_terms = x_factors * data.weights
-        prefix = jnp.cumsum(prefix_terms) - prefix_terms
-        k_emit = data.sigma_emit[factor_ids, prefix]
-        k_trans = data.sigma_trans[factor_ids, prefix]
 
         def update_factor(
             Ts_i: jax.Array,
@@ -210,6 +212,11 @@ def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax
             trans_Ts_i = Ts_i[k_trans_i]
             return eta_i @ trans_Ts_i[x_i], prob
 
+        factor_ids = jnp.arange(data.Ts.shape[0])
+        prefix_terms = x_factors * data.weights
+        prefix = jnp.cumsum(prefix_terms) - prefix_terms
+        k_emit = data.sigma_emit[factor_ids, prefix]
+        k_trans = data.sigma_trans[factor_ids, prefix]
         next_eta, probs = jax.vmap(update_factor, in_axes=0)(data.Ts, data.w, eta, x_factors, k_emit, k_trans)
         return next_eta, jnp.prod(probs)
 

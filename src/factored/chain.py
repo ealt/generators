@@ -127,6 +127,7 @@ def obs_dist(data: Data, eta: jax.Array, *, decode: Callable[[jax.Array], jax.Ar
 
 
 def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
+
     def sample_factor(
         x_prev: jax.Array, args: tuple[FactorData, jax.Array, jax.Array, jax.Array]
     ) -> tuple[jax.Array, jax.Array]:
@@ -145,6 +146,7 @@ def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
 
 
 def update(data: Data, eta: jax.Array, x_factors: jax.Array) -> jax.Array:
+
     def update_factor(
         factor_i: FactorData, sigma_trans_i: jax.Array, x_prev: jax.Array, eta_i: jax.Array, x_i: jax.Array
     ) -> jax.Array:
@@ -165,6 +167,7 @@ def generate(
     *,
     encode: Callable[[jax.Array], jax.Array],
 ) -> tuple[jax.Array, jax.Array]:
+
     def step(eta, key):
         x_factors = sample(data, eta, key)
         x = encode(x_factors)
@@ -174,6 +177,7 @@ def generate(
 
 
 def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax.Array], jax.Array]) -> jax.Array:
+
     def unnorm_update_factor(
         Ts_i: jax.Array,
         w_i: jax.Array,
