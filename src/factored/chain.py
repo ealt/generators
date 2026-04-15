@@ -26,10 +26,10 @@ class Data(NamedTuple):
 
 
 def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> bool:
-    if not len(Ts_list) > 0:
+    if len(Ts_list) == 0:
         return False
     Ks = jnp.array([Ts_i.shape[0] for Ts_i in Ts_list])
-    if not jnp.all(Ks > 0):
+    if jnp.any(Ks <= 0):
         return False
     if not all(
         all(validate_variant(Ts_i[k]) for k in range(int(Ks_i))) for Ts_i, Ks_i in zip(Ts_list, Ks, strict=True)
@@ -46,9 +46,9 @@ def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_t
             return False
         if not all(jnp.all(jnp.isfinite(sigma_i)) for sigma_i in sigma_list):
             return False
-        if not all(jnp.all(sigma_i >= 0) for sigma_i in sigma_list):
+        if any(jnp.any(sigma_i < 0) for sigma_i in sigma_list):
             return False
-        if not all(jnp.all(sigma_i < K_i) for sigma_i, K_i in zip(sigma_list, Ks, strict=True)):
+        if any(jnp.any(sigma_i >= K_i) for sigma_i, K_i in zip(sigma_list, Ks, strict=True)):
             return False
         return all(sigma_i.shape == (V_prev,) for sigma_i, V_prev in zip(sigma_list, Vs_prev, strict=True))
 
@@ -133,8 +133,8 @@ def sample(data: Data, eta: jax.Array, key: jax.Array) -> jax.Array:
         factor_i, sigma_emit_i, eta_i, key_i = args
         k_i = sigma_emit_i[x_prev]
         variant = FactorData(Ts=factor_i.Ts[k_i], eta_0=factor_i.eta_0[k_i], w=factor_i.w[k_i])
-        x = sample_variant(variant, eta_i, key_i)
-        return x, x
+        x_i = sample_variant(variant, eta_i, key_i)
+        return x_i, x_i
 
     factor_data = FactorData(Ts=data.Ts, eta_0=data.eta_0, w=data.w)
     num_factors = int(data.Ts.shape[0])
@@ -187,7 +187,6 @@ def seq_prob(data: Data, eta: jax.Array, xs: jax.Array, *, decode: Callable[[jax
         emit_Ts_i = Ts_i[k_emit_i]
         emit_w_i = w_i[k_emit_i]
         prob = (eta_i @ emit_Ts_i[x_i] @ emit_w_i) / (eta_i @ emit_w_i)
-
         k_trans_i = sigma_trans_i[x_prev]
         trans_Ts_i = Ts_i[k_trans_i]
         next_eta = eta_i @ trans_Ts_i[x_i]
