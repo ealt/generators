@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from src.factored.independent import (
-    compile_matrices,
+    compile,
     generate,
     init,
     obs_dist,
@@ -24,7 +24,7 @@ def test_compile():
     ]
     assert validate(Ts_list)
 
-    composite = compile_matrices(Ts_list)
+    composite = compile(Ts_list)
     assert validate_factor(composite)
     expected = jnp.zeros((6, 6, 6))
     expected = expected.at[0, 0, 3].set(1)  # (0, 0) -> (1, 1)

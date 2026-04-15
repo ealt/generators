@@ -49,7 +49,8 @@ convention = "google"
 [tool.pylint."MESSAGES CONTROL"]
 # Disable line-too-long check since ruff handles line length (120 chars)
 # C0103 invalid-name: naming convention (variables, etc.)
-disable = ["line-too-long", "duplicate-code", "invalid-name"]
+# W0622 redefined-builtin: allow names like "compile" in project APIs
+disable = ["line-too-long", "duplicate-code", "invalid-name", "redefined-builtin"]
 
 [tool.pyright]
 typeCheckingMode = "standard"

@@ -60,7 +60,7 @@ def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_t
     return validate_sigma(sigma_emit_list) and validate_sigma(sigma_trans_list)
 
 
-def compile_matrices(Ts_list: list[jax.Array], sigma_list: list[jax.Array]) -> jax.Array:
+def compile(Ts_list: list[jax.Array], sigma_list: list[jax.Array]) -> jax.Array:
     """Compile a single-selector sequential chain into a single GHMM transition tensor."""
     matrices = []
     vocabs = [range(Ts_i.shape[1]) for Ts_i in Ts_list]

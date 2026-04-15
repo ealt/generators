@@ -31,7 +31,7 @@ def validate(Ts_list: list[jax.Array]) -> bool:
     return len(Ts_list) > 0 and all(validate_factor(Ts) for Ts in Ts_list)
 
 
-def compile_matrices(Ts_list: list[jax.Array]) -> jax.Array:
+def compile(Ts_list: list[jax.Array]) -> jax.Array:
     """Compile a list of independent transition matrices into a single transition matrix."""
     matrices = []
     factor_vocabs = [range(Ts.shape[0]) for Ts in Ts_list]

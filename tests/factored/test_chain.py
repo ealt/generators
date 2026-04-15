@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from src.factored.chain import (
-    compile_matrices,
+    compile,
     generate,
     init,
     obs_dist,
@@ -28,7 +28,7 @@ def test_compile():
         jnp.array([0, 1]),
     ]
 
-    composite = compile_matrices(Ts_list, sigma_list)
+    composite = compile(Ts_list, sigma_list)
     assert validate_ghmm(composite)
     expected = jnp.zeros((6, 6, 6))
     expected = expected.at[0, 0, 3].set(1)  # (0, 0) -> (1, 1)
