@@ -8,6 +8,8 @@ Local over distributed.
 
 Brevity over verbosity.
 
+Make every LOC count.
+
 Some assembly required.
 
 Trust the user.
