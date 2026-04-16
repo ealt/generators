@@ -60,6 +60,8 @@ def test_init():
         jnp.array([[1, 0], [1, 0]]),
     ]
 
+    assert validate(Ts_list, sigma_emit_list, sigma_trans_list)
+
     data = init(Ts_list, sigma_emit_list, sigma_trans_list)
 
     assert jnp.allclose(data.weights, jnp.array([1, 2, 4]))
