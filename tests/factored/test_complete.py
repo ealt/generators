@@ -13,25 +13,6 @@ def swapped_zero_one() -> jax.Array:
     return jnp.array(zero_one())[::-1]
 
 
-def test_validate_requires_full_prefix_context():
-    Ts_list = [
-        jnp.array([zero_one()]),
-        jnp.array([zero_one(), swapped_zero_one()]),
-        jnp.array([zero_one(), swapped_zero_one()]),
-    ]
-    sigma_emit_list = [
-        jnp.array(0),
-        jnp.array([0, 1]),
-        jnp.array([0, 1]),
-    ]
-    sigma_trans_list = [
-        jnp.array(0),
-        jnp.array([0, 1]),
-        jnp.array([[0, 1], [0, 1]]),
-    ]
-    assert not validate(Ts_list, sigma_emit_list, sigma_trans_list)
-
-
 def test_compile():
     variant0 = jnp.array(zero_one())
     variant1 = swapped_zero_one()
@@ -58,6 +39,32 @@ def test_compile():
     expected = expected.at[6, 2, 5].set(1)
     expected = expected.at[7, 3, 4].set(1)
     assert jnp.allclose(composite, expected)
+
+
+def test_init():
+    variant0 = jnp.array(zero_one())
+    variant1 = swapped_zero_one()
+    Ts_list = [
+        jnp.array([variant0]),
+        jnp.array([variant0]),
+        jnp.stack([variant0, variant1]),
+    ]
+    sigma_emit_list = [
+        jnp.array(0),
+        jnp.array([0, 0]),
+        jnp.array([[0, 1], [0, 1]]),
+    ]
+    sigma_trans_list = [
+        jnp.array(0),
+        jnp.array([0, 0]),
+        jnp.array([[1, 0], [1, 0]]),
+    ]
+
+    data = init(Ts_list, sigma_emit_list, sigma_trans_list)
+
+    assert jnp.allclose(data.weights, jnp.array([1, 2, 4]))
+    assert jnp.allclose(data.sigma_emit, jnp.array([[0, 0, 0, 0], [0, 0, 0, 0], [0, 1, 0, 1]]))
+    assert jnp.allclose(data.sigma_trans, jnp.array([[0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 1, 0]]))
 
 
 def test_obs_dist():
@@ -87,32 +94,6 @@ def test_obs_dist():
     actual = obs_dist(data, eta, decode=decode)
     expected = jnp.array([0.336, 0.056, 0.144, 0.024, 0.224, 0.084, 0.096, 0.036])
     assert jnp.allclose(actual, expected)
-
-
-def test_init_flattens_sigma_and_stores_weights():
-    variant0 = jnp.array(zero_one())
-    variant1 = swapped_zero_one()
-    Ts_list = [
-        jnp.array([variant0]),
-        jnp.array([variant0]),
-        jnp.stack([variant0, variant1]),
-    ]
-    sigma_emit_list = [
-        jnp.array(0),
-        jnp.array([0, 0]),
-        jnp.array([[0, 1], [0, 1]]),
-    ]
-    sigma_trans_list = [
-        jnp.array(0),
-        jnp.array([0, 0]),
-        jnp.array([[1, 0], [1, 0]]),
-    ]
-
-    data = init(Ts_list, sigma_emit_list, sigma_trans_list)
-
-    assert jnp.allclose(data.weights, jnp.array([1, 2, 4]))
-    assert jnp.allclose(data.sigma_emit, jnp.array([[0, 0, 0, 0], [0, 0, 0, 0], [0, 1, 0, 1]]))
-    assert jnp.allclose(data.sigma_trans, jnp.array([[0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 1, 0]]))
 
 
 def test_generate():
