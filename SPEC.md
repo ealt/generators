@@ -47,7 +47,7 @@ The following conventions are used within this document. They are not prescripti
 | $\boldsymbol{\eta}_0$ | Initial state representative |
 | $\boldsymbol{\alpha}_{\text{mix}}$ | Mixture-weight vector for a nonergodic mixture |
 | $\boldsymbol{\beta}$ | Current component-belief vector in a nonergodic mixture |
-| $s^i$ | State of component $i$ in a nonergodic mixture |
+| $s^c$ | State of component $c$ in a nonergodic mixture |
 | $\mathcal{X}_{\mathrm{enc}}$ | Set of per-factor tuples present in the authoritative composite-token encoding |
 | $K_i$ | Number of variants for factor $i$ in a factored process |
 | $F$ | Number of factors in a factored process |
@@ -57,6 +57,7 @@ The following conventions are used within this document. They are not prescripti
 
 - Mathematical indexing is **1-based** throughout the spec unless a section explicitly states otherwise.
 - For per-factor observations and states, the factor label is written as a superscript, e.g. $x^i$, $\boldsymbol{\eta}^i$, and $s^i$. These superscripts are labels, not powers.
+- For per-component observations and states in nonergodic mixtures, the component label is written as a superscript where that notation is used, e.g. $x^c$ and $s^c$.
 - Subscripts are used for indexed families, metadata, and time indices, e.g. $K_i$, $\sigma_i$, $\mathrm{deps}_i$, $T_{i \mid k}$, $\boldsymbol{\eta}_t^i$, and $x_t^i$.
 - A superscript $\uparrow$ on a tuple means its entries are ordered by increasing factor index.
 - GHMM state representatives are **row vectors**. Two nonzero nonnegative row vectors $\boldsymbol{\eta}$ and $c \boldsymbol{\eta}$ with $c > 0$ represent the same predictive state.
@@ -556,28 +557,28 @@ A nonergodic mixture combines $C$ component processes into a single generative p
 A nonergodic mixture is defined by:
 
 - component processes, each independently defined under its own process type
-- component weights $\boldsymbol{\alpha}_{\text{mix}} \in \mathbb{R}^C$ with $\alpha_{\text{mix},i} \ge 0$ for all $i$ and $\sum_i \alpha_{\text{mix},i} = 1$
+- component weights $\boldsymbol{\alpha}_{\text{mix}} \in \mathbb{R}^C$ with $\alpha_{\text{mix},c} \ge 0$ for all $c$ and $\sum_c \alpha_{\text{mix},c} = 1$
 - vocabulary mappings
 
-For each component $i$, let
+For each component $c$, let
 
 $$
-\phi_i : \{1, \ldots, V_i\} \to \{1, \ldots, V_{\text{global}}\}
+\phi_c : \{1, \ldots, V_c\} \to \{1, \ldots, V_{\text{global}}\}
 $$
 
 be an injective local-to-global token map, and let
 
 $$
-S_i = \operatorname{Im}(\phi_i)
+S_c = \operatorname{Im}(\phi_c)
 $$
 
-denote its image. The images $S_i$ may overlap across components. The inverse $\phi_i^{-1}(x)$ is defined exactly when $x \in S_i$.
+denote its image. The images $S_c$ may overlap across components. The inverse $\phi_c^{-1}(x)$ is defined exactly when $x \in S_c$.
 
 ### 5.2 State structure
 
 The state of a nonergodic mixture consists of:
 
-- component beliefs $\boldsymbol{\beta} \in \mathbb{R}^C$ with $\beta_i \ge 0$ for all $i$ and $\sum_i \beta_i = 1$
+- component beliefs $\boldsymbol{\beta} \in \mathbb{R}^C$ with $\beta_c \ge 0$ for all $c$ and $\sum_c \beta_c = 1$
 - per-component states $(s^1, \ldots, s^C)$, using the state representation appropriate to each component process
 
 ### 5.3 Observation probability distribution
@@ -585,22 +586,22 @@ The state of a nonergodic mixture consists of:
 $$
 P(x \mid \boldsymbol{\beta}, s^1, \ldots, s^C)
 =
-\sum_{i=1}^{C}
-\beta_i \,
-\mathbf{1}\{x \in S_i\} \,
-P_i(\phi_i^{-1}(x) \mid s^i),
+\sum_{c=1}^{C}
+\beta_c \,
+\mathbf{1}\{x \in S_c\} \,
+P_c(\phi_c^{-1}(x) \mid s^c),
 $$
 
-where $P_i(\cdot \mid s^i)$ is component $i$'s local observation distribution under its own process semantics.
+where $P_c(\cdot \mid s^c)$ is component $c$'s local observation distribution under its own process semantics.
 
 ### 5.4 State update
 
 Define
 
 $$
-\ell_i =
-\mathbf{1}\{x \in S_i\} \,
-P_i(\phi_i^{-1}(x) \mid s^i).
+\ell_c =
+\mathbf{1}\{x \in S_c\} \,
+P_c(\phi_c^{-1}(x) \mid s^c).
 $$
 
 If
@@ -612,20 +613,20 @@ $$
 then
 
 $$
-\beta_i' = \frac{\beta_i \ell_i}{L}.
+\beta_c' = \frac{\beta_c \ell_c}{L}.
 $$
 
 Each component state updates by its own process update rule:
 
 $$
-s^{i\prime} =
+s^{c\prime} =
 \begin{cases}
-\operatorname{Update}_i(s^i, \phi_i^{-1}(x)) & \text{if } \ell_i > 0, \\
-s^i & \text{otherwise.}
+\operatorname{Update}_c(s^c, \phi_c^{-1}(x)) & \text{if } \ell_c > 0, \\
+s^c & \text{otherwise.}
 \end{cases}
 $$
 
-If $L = 0$, then $\boldsymbol{\beta}$ and all $s^i$ remain unchanged.
+If $L = 0$, then $\boldsymbol{\beta}$ and all $s^c$ remain unchanged.
 
 ### 5.5 Sequence probability
 
@@ -633,10 +634,10 @@ Given an initial mixture state $(\boldsymbol{\beta}_0, s_0^1, \ldots, s_0^C)$,
 
 $$
 P(x_1, \ldots, x_T) =
-\sum_{i=1}^{C}
-\beta_{0,i} \,
-\mathbf{1}\{\forall t,\ x_t \in S_i\} \,
-P_i(\phi_i^{-1}(x_1), \ldots, \phi_i^{-1}(x_T) \mid s_0^i).
+\sum_{c=1}^{C}
+\beta_{0,c} \,
+\mathbf{1}\{\forall t,\ x_t \in S_c\} \,
+P_c(\phi_c^{-1}(x_1), \ldots, \phi_c^{-1}(x_T) \mid s_0^c).
 $$
 
 For the empty sequence $\epsilon$,
@@ -649,7 +650,7 @@ Under the default initial state of §5.7, $\boldsymbol{\beta}_0 = \boldsymbol{\a
 
 ### 5.6 Generation
 
-Generation from an initial mixture state samples one component once from the initial component-belief vector $\boldsymbol{\beta}_0$, generates the full local sequence from that component, and maps each local token through $\phi_i$. Under the default initial state of §5.7, $\boldsymbol{\beta}_0 = \boldsymbol{\alpha}_{\text{mix}}$. There is no mid-sequence switching.
+Generation from an initial mixture state samples one component once from the initial component-belief vector $\boldsymbol{\beta}_0$, generates the full local sequence from that component, and maps each local token through $\phi_c$. Under the default initial state of §5.7, $\boldsymbol{\beta}_0 = \boldsymbol{\alpha}_{\text{mix}}$. There is no mid-sequence switching.
 
 If a generation API exposes a final state, the normative final state is the public process state obtained by filtering the emitted global sequence under the mixture update rule above, not merely the latent chosen component. An implementation may additionally expose the latent chosen component as auxiliary output.
 
@@ -933,7 +934,7 @@ Categories covered:
 | Stationary distribution | The normalized left eigenvector $\boldsymbol{\pi}$ of $T$ at eigenvalue 1. The associated canonical stationary state representative is $\boldsymbol{\eta}_* = \boldsymbol{\pi} / (\boldsymbol{\pi} \cdot \mathbf{w})$. |
 | Transition selector ($\sigma_i^{\mathrm{trans}}$) | A function selecting the transition variant for factor $i$ after the full current observation tuple is known |
 | Variant | One of the alternative transition-matrix families available to a factor |
-| Vocabulary mapping ($\phi_i$) | An injective map from a component's local token indices to global token indices in a nonergodic mixture |
+| Vocabulary mapping ($\phi_c$) | An injective map from a component's local token indices to global token indices in a nonergodic mixture |
 
 ## Appendix A: Optional Runtime Interoperability Profile
 
