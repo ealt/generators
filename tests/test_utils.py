@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights, principal_ev, stack
+from generators.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights, principal_ev, stack
 
 
 def test_principal_ev():

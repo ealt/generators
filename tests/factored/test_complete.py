@@ -3,9 +3,9 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from src.factored.complete import compile, generate, init, obs_dist, seq_prob, validate, validate_eta
-from src.ghmm.process import validate as validate_ghmm
-from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
+from generators.factored.complete import compile, generate, init, obs_dist, seq_prob, validate, validate_eta
+from generators.ghmm.process import validate as validate_ghmm
+from generators.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
 from tests.transition_matrices import zero_one
 
 

@@ -3,7 +3,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from src.factored.chain import (
+from generators.factored.chain import (
     compile,
     generate,
     init,
@@ -12,8 +12,8 @@ from src.factored.chain import (
     validate,
     validate_eta,
 )
-from src.ghmm.process import validate as validate_ghmm
-from src.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
+from generators.ghmm.process import validate as validate_ghmm
+from generators.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
 from tests.transition_matrices import cycle, zero_one
 
 

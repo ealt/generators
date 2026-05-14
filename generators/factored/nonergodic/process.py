@@ -3,10 +3,10 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
-from src.ghmm.process import Data as FactorData
-from src.ghmm.process import init as init_factor
-from src.ghmm.process import validate as validate_factor
-from src.utils import stack
+from generators.ghmm.process import Data as FactorData
+from generators.ghmm.process import init as init_factor
+from generators.ghmm.process import validate as validate_factor
+from generators.utils import stack
 
 
 class Data(NamedTuple):

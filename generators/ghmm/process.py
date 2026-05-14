@@ -3,7 +3,7 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 
-from src.utils import principal_ev
+from generators.utils import principal_ev
 
 
 class Data(NamedTuple):

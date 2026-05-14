@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from src.ghmm.process import generate, init, seq_prob, validate
+from generators.ghmm.process import generate, init, seq_prob, validate
 from tests.transition_matrices import zero_one_random
 
 

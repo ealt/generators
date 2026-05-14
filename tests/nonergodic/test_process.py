@@ -1,8 +1,8 @@
 import jax
 import jax.numpy as jnp
 
-from src.factored.nonergodic.process import compile, generate, init, obs_dist, seq_prob
-from src.ghmm.process import validate as validate_ghmm
+from generators.factored.nonergodic.process import compile, generate, init, obs_dist, seq_prob
+from generators.ghmm.process import validate as validate_ghmm
 from tests.transition_matrices import cycle, zero_one
 
 
