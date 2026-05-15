@@ -42,7 +42,7 @@ def validate(Ts_list: list[jax.Array], phi_list: list[jax.Array], beta_0: jax.Ar
 
         if len(phi_list) != len(Ts_list):
             return False
-        if not all(validate_phi(phi, Ts_i) for phi, Ts_i in zip(phi_list, Ts_list, strict=True)):
+        if not all(validate_phi(phi_c, Ts_c) for phi_c, Ts_c in zip(phi_list, Ts_list, strict=True)):
             return False
         vocab: jax.Array = jnp.unique(jnp.concatenate(phi_list))
         return int(vocab.max()) == len(vocab) - 1
