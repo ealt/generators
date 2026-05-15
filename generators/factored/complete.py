@@ -27,20 +27,18 @@ class Data(NamedTuple):
 
 
 def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> bool:
-    if len(Ts_list) == 0:
-        return False
     Ks = jnp.array([Ts_i.shape[0] for Ts_i in Ts_list])
-    if jnp.any(Ks <= 0):
-        return False
-    if not all(
-        all(validate_variant(Ts_i[k]) for k in range(int(Ks_i))) for Ts_i, Ks_i in zip(Ts_list, Ks, strict=True)
-    ):
-        return False
+
+    def validate_Ts_list() -> bool:
+        if len(Ts_list) == 0:
+            return False
+        if jnp.any(Ks <= 0):
+            return False
+        return all(
+            all(validate_variant(Ts_i[k]) for k in range(int(Ks_i))) for Ts_i, Ks_i in zip(Ts_list, Ks, strict=True)
+        )
 
     Vs = jnp.array([Ts_i.shape[1] for Ts_i in Ts_list])
-
-    def sigma_shape(i: int) -> tuple[int, ...]:
-        return tuple(int(V_j) for V_j in Vs[:i])
 
     def validate_sigma(sigma_list: list[jax.Array]) -> bool:
         if len(sigma_list) != len(Ts_list):
@@ -53,9 +51,9 @@ def validate(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_t
             return False
         if any(jnp.any(sigma_i >= K_i) for sigma_i, K_i in zip(sigma_list, Ks, strict=True)):
             return False
-        return all(sigma_i.shape == sigma_shape(i) for i, sigma_i in enumerate(sigma_list))
+        return all(sigma_i.shape == tuple(int(V_j) for V_j in Vs[:i]) for i, sigma_i in enumerate(sigma_list))
 
-    return validate_sigma(sigma_emit_list) and validate_sigma(sigma_trans_list)
+    return validate_Ts_list() and validate_sigma(sigma_emit_list) and validate_sigma(sigma_trans_list)
 
 
 def compile(Ts_list: list[jax.Array], sigma_list: list[jax.Array]) -> jax.Array:

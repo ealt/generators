@@ -22,37 +22,41 @@ class Data(NamedTuple):
 
 
 def validate(Ts_list: list[jax.Array], phi_list: list[jax.Array], beta_0: jax.Array) -> bool:
-    if len(Ts_list) == 0:
-        return False
-    if not all(validate_factor(Ts) for Ts in Ts_list):
-        return False
+    def validate_Ts_list() -> bool:
+        if len(Ts_list) == 0:
+            return False
+        return all(validate_factor(Ts) for Ts in Ts_list)
 
-    def validate_phi(phi: jax.Array, Ts: jax.Array) -> bool:
-        if phi.shape != (Ts.shape[0],):
-            return False
-        if not jnp.issubdtype(phi.dtype, jnp.integer):
-            return False
-        if not jnp.all(jnp.isfinite(phi)):
-            return False
-        if jnp.any(phi < 0):
-            return False
-        return len(jnp.unique(phi)) == len(phi)
+    def validate_phi_list() -> bool:
 
-    if len(phi_list) != len(Ts_list):
-        return False
-    if not all(validate_phi(phi, Ts_i) for phi, Ts_i in zip(phi_list, Ts_list, strict=True)):
-        return False
-    vocab: jax.Array = jnp.unique(jnp.concatenate(phi_list))
-    if vocab.max() != len(vocab) - 1:
-        return False
+        def validate_phi(phi: jax.Array, Ts: jax.Array) -> bool:
+            if phi.shape != (Ts.shape[0],):
+                return False
+            if not jnp.issubdtype(phi.dtype, jnp.integer):
+                return False
+            if not jnp.all(jnp.isfinite(phi)):
+                return False
+            if jnp.any(phi < 0):
+                return False
+            return len(jnp.unique(phi)) == len(phi)
 
-    if beta_0.shape != (len(Ts_list),):
-        return False
-    if not jnp.all(jnp.isfinite(beta_0)):
-        return False
-    if jnp.any(beta_0 < 0):
-        return False
-    return bool(jnp.isclose(jnp.sum(beta_0), 1))
+        if len(phi_list) != len(Ts_list):
+            return False
+        if not all(validate_phi(phi, Ts_i) for phi, Ts_i in zip(phi_list, Ts_list, strict=True)):
+            return False
+        vocab: jax.Array = jnp.unique(jnp.concatenate(phi_list))
+        return int(vocab.max()) == len(vocab) - 1
+
+    def validate_beta_0() -> bool:
+        if beta_0.shape != (len(Ts_list),):
+            return False
+        if not jnp.all(jnp.isfinite(beta_0)):
+            return False
+        if jnp.any(beta_0 < 0):
+            return False
+        return bool(jnp.isclose(jnp.sum(beta_0), 1))
+
+    return validate_Ts_list() and validate_phi_list() and validate_beta_0()
 
 
 def compile(Ts_list: list[jax.Array], phi_list: list[jax.Array], beta_0: jax.Array) -> jax.Array:
