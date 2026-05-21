@@ -21,8 +21,6 @@ def validate(Ts: jax.Array) -> bool:
         return False
     if not jnp.all(jnp.isfinite(Ts)):
         return False
-    if not jnp.all(Ts >= 0):
-        return False
     T = jnp.sum(Ts, axis=0)
     norm = jnp.linalg.norm(T, ord=jnp.inf)
     return bool(jnp.isclose(norm, 1))
