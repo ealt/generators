@@ -13,13 +13,13 @@ from generators.factored.independent import (
 )
 from generators.ghmm.process import validate as validate_factor
 from generators.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
-from tests.transition_matrices import cycle, zero_one
+from transition_matrices.classical import cycle
 
 
 def test_compile():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(cycle(3, 1.0)),
+        cycle(2),
+        cycle(3, 1.0),
     ]
     assert validate(Ts_list)
 
@@ -37,16 +37,16 @@ def test_compile():
 
 def test_init():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(cycle(3, 1.0)),
+        cycle(2),
+        cycle(3, 1.0),
     ]
     data = init(Ts_list)
     assert data.Ts.shape == (2, 3, 3, 3)
-    assert jnp.allclose(data.Ts[0, :2, :2, :2], jnp.array([zero_one()]))
+    assert jnp.allclose(data.Ts[0, :2, :2, :2], cycle(2))
     assert jnp.all(data.Ts[0, 2, :, :] == 0)
     assert jnp.all(data.Ts[0, :, 2, :] == 0)
     assert jnp.all(data.Ts[0, :, :, 2] == 0)
-    assert jnp.allclose(data.Ts[1], jnp.array([cycle(3, 1.0)]))
+    assert jnp.allclose(data.Ts[1], cycle(3, 1.0))
     assert jnp.allclose(data.eta_0, jnp.array([[1 / 2, 1 / 2, 0], [1 / 3, 1 / 3, 1 / 3]]))
     assert jnp.allclose(data.w, jnp.array([[1, 1, 0], [1, 1, 1]]))
     assert jnp.allclose(data.Vs, jnp.array([2, 3]))
@@ -56,8 +56,8 @@ def test_init():
 
 def test_obs_dist():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(cycle(3, 1.0)),
+        cycle(2),
+        cycle(3, 1.0),
     ]
     data = init(Ts_list)
     eta = jnp.array([[0.8, 0.2, 0.0], [0.1, 0.6, 0.3]])
@@ -70,8 +70,8 @@ def test_obs_dist():
 
 def test_generate():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(cycle(3, 1.0)),
+        cycle(2),
+        cycle(3, 1.0),
     ]
     data = init(Ts_list)
     keys = jax.random.split(jax.random.key(0), 12)
@@ -88,8 +88,8 @@ def test_generate():
 
 def test_seq_prob():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(cycle(3, 1.0)),
+        cycle(2),
+        cycle(3, 1.0),
     ]
     data = init(Ts_list)
     xs = jnp.array([0, 3, 4, 1, 2, 5])

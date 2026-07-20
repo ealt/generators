@@ -3,13 +3,13 @@ import jax.numpy as jnp
 
 from generators.ghmm.process import validate as validate_ghmm
 from generators.nonergodic.ghmm import compile, generate, init, obs_dist, seq_prob
-from tests.transition_matrices import cycle, zero_one
+from transition_matrices.classical import cycle
 
 
 def test_compile():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(zero_one()),
+        jnp.array(cycle(2)),
+        jnp.array(cycle(2)),
     ]
     phi_list = [
         jnp.array([0, 1]),
@@ -34,7 +34,7 @@ def test_compile():
 
 def test_init():
     Ts_list = [
-        jnp.array(zero_one()),
+        jnp.array(cycle(2)),
         jnp.array(cycle(3, 0.5)),
     ]
     phi_list = [
@@ -77,7 +77,7 @@ def test_init():
 
 def test_obs_dist():
     Ts_list = [
-        jnp.array(zero_one()),
+        jnp.array(cycle(2)),
         jnp.array(cycle(3, 0.5)),
     ]
     phi_list = [
@@ -95,8 +95,8 @@ def test_obs_dist():
 
 def test_generate():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(cycle(3, 1.0)),
+        cycle(2),
+        cycle(3, 1.0),
     ]
     phi_list = [
         jnp.array([0, 1]),
@@ -158,8 +158,8 @@ def test_generate():
 
 def test_seq_prob():
     Ts_list = [
-        jnp.array(zero_one()),
-        jnp.array(cycle(3, 1.0)),
+        cycle(2),
+        cycle(3, 1.0),
     ]
     phi_list = [
         jnp.array([0, 1]),

@@ -14,18 +14,18 @@ from generators.nonergodic.factored import (
 )
 from generators.nonergodic.ghmm import compile as compile_nonergodic
 from generators.utils import mixed_radix_decode, mixed_radix_weights
-from tests.transition_matrices import cycle, zero_one
+from transition_matrices.classical import cycle
 
 
 def test_compile():
     Ts_lists = [
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
     ]
     phi_list = [
@@ -48,12 +48,12 @@ def test_compile():
 def test_init():
     Ts_lists = [
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
     ]
     phi_list = [
@@ -153,12 +153,12 @@ def test_init():
 def test_obs_dist():
     Ts_lists = [
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
     ]
     phi_list = [
@@ -179,12 +179,12 @@ def test_obs_dist():
 def test_generate():
     Ts_lists = [
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
     ]
     phi_list = [
@@ -261,12 +261,12 @@ def test_generate():
 def test_seq_prob():
     Ts_lists = [
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
         [
-            jnp.array(zero_one()),
-            jnp.array(cycle(3, 1.0)),
+            cycle(2),
+            cycle(3, 1.0),
         ],
     ]
     phi_list = [

@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from generators.ghmm.process import generate, init, seq_prob, validate
-from tests.transition_matrices import zero_one_random
+from transition_matrices.classical import zero_one_random
 
 
 def test_init():

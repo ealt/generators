@@ -14,13 +14,13 @@ from generators.factored.chain import (
 )
 from generators.ghmm.process import validate as validate_ghmm
 from generators.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
-from tests.transition_matrices import cycle, zero_one
+from transition_matrices.classical import cycle
 
 
 def test_compile():
     Ts_list = [
-        jnp.array([zero_one()]),
-        jnp.array([cycle(3, 1.0), cycle(3, 0.0)]),
+        jnp.array([cycle(2)]),
+        jnp.stack([cycle(3, 1.0), cycle(3, 0.0)]),
     ]
     sigma_list = [
         jnp.array([0]),
@@ -41,8 +41,8 @@ def test_compile():
 
 def test_init():
     Ts_list = [
-        jnp.array([zero_one()]),
-        jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
+        jnp.array([cycle(2)]),
+        jnp.stack([cycle(3, 0.75), cycle(3, 0.25)]),
     ]
     sigma_emit_list = [
         jnp.array([0]),
@@ -114,7 +114,7 @@ def test_init():
 
 
 def test_obs_dist():
-    variant0 = jnp.array(zero_one())
+    variant0 = cycle(2)
     variant1 = jnp.array(
         [
             [
@@ -128,7 +128,7 @@ def test_obs_dist():
         ]
     )
     Ts_list = [
-        jnp.array([zero_one()]),
+        jnp.array([cycle(2)]),
         jnp.stack([variant0, variant1]),
     ]
     sigma_emit_list = [
@@ -155,7 +155,7 @@ def test_obs_dist():
 
 def test_generate():
     Ts_list = [
-        jnp.array([zero_one()]),
+        jnp.array([cycle(2)]),
         jnp.array([cycle(3, 0.75), cycle(3, 0.25)]),
     ]
     sigma_emit_list = [
@@ -190,8 +190,8 @@ def test_generate():
 
 def test_seq_prob():
     Ts_list = [
-        jnp.array([zero_one()]),
-        jnp.array([cycle(3, 1.0), cycle(3, 1.0)]),
+        jnp.array([cycle(2)]),
+        jnp.stack([cycle(3, 1.0), cycle(3, 1.0)]),
     ]
     sigma_emit_list = [
         jnp.array([0]),

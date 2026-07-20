@@ -6,16 +6,16 @@ import jax.numpy as jnp
 from generators.factored.complete import compile, generate, init, obs_dist, seq_prob, validate, validate_eta
 from generators.ghmm.process import validate as validate_ghmm
 from generators.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights
-from tests.transition_matrices import zero_one
+from transition_matrices.classical import cycle
 
 
-def swapped_zero_one() -> jax.Array:
-    return jnp.array(zero_one())[::-1]
+def swapped_cycle(n: int) -> jax.Array:
+    return cycle(n)[::-1]
 
 
 def test_compile():
-    variant0 = jnp.array(zero_one())
-    variant1 = swapped_zero_one()
+    variant0 = cycle(2)
+    variant1 = swapped_cycle(2)
     Ts_list = [
         jnp.array([variant0]),
         jnp.array([variant0]),
@@ -42,8 +42,8 @@ def test_compile():
 
 
 def test_init():
-    variant0 = jnp.array(zero_one())
-    variant1 = swapped_zero_one()
+    variant0 = cycle(2)
+    variant1 = swapped_cycle(2)
     Ts_list = [
         jnp.array([variant0]),
         jnp.array([variant0]),
@@ -70,8 +70,8 @@ def test_init():
 
 
 def test_obs_dist():
-    variant0 = jnp.array(zero_one())
-    variant1 = swapped_zero_one()
+    variant0 = cycle(2)
+    variant1 = swapped_cycle(2)
     Ts_list = [
         jnp.array([variant0]),
         jnp.array([variant0]),
@@ -99,8 +99,8 @@ def test_obs_dist():
 
 
 def test_generate():
-    variant0 = jnp.array(zero_one())
-    variant1 = swapped_zero_one()
+    variant0 = cycle(2)
+    variant1 = swapped_cycle(2)
     Ts_list = [
         jnp.array([variant0]),
         jnp.array([variant0]),
@@ -134,8 +134,8 @@ def test_generate():
 
 
 def test_seq_prob():
-    variant0 = jnp.array(zero_one())
-    variant1 = swapped_zero_one()
+    variant0 = cycle(2)
+    variant1 = swapped_cycle(2)
     Ts_list = [
         jnp.array([variant0]),
         jnp.array([variant0]),
