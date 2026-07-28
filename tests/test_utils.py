@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import pytest
 
 from generators.utils import mixed_radix_decode, mixed_radix_encode, mixed_radix_weights, principal_ev, stack
 
@@ -13,6 +14,25 @@ def test_principal_ev():
     actual = principal_ev(T)
     expected = jnp.array([2, 1]) * (2 / 3)
     assert jnp.allclose(actual, expected)
+
+
+def test_principal_ev_periodic():
+    # A 3-cycle's spectrum is the cube roots of unity: three eigenvalues of modulus 1,
+    # of which only the real one is Perron.
+    T = jnp.array(
+        [
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0],
+        ]
+    )
+    assert jnp.allclose(principal_ev(T), jnp.ones(3))
+
+
+def test_principal_ev_degenerate():
+    T = jnp.eye(2)
+    with pytest.raises(ValueError, match="multiplicity 2"):
+        principal_ev(T)
 
 
 def test_stack():

@@ -3,8 +3,31 @@ import jax.numpy as jnp
 
 
 def principal_ev(T: jax.Array) -> jax.Array:
+    """Eigenvector of the Perron root of T, normalized to mean 1.
+
+    The Perron root is selected by largest real part, not largest modulus: a periodic
+    transition matrix has one eigenvalue of unit modulus per period and only the real
+    one is Perron.
+
+    Args:
+        T: Square matrix.
+
+    Returns:
+        The Perron eigenvector, scaled so its entries average to 1.
+
+    Raises:
+        ValueError: If the Perron root is degenerate, in which case T alone does not
+            determine an eigenvector.
+    """
     eigenvalues, eigenvectors = jnp.linalg.eig(T)
-    i = jnp.argmax(jnp.abs(eigenvalues))
+    i = jnp.argmax(jnp.real(eigenvalues))
+    multiplicity = int(jnp.sum(jnp.isclose(eigenvalues, eigenvalues[i])))
+    if multiplicity > 1:
+        raise ValueError(
+            f"leading eigenvalue {eigenvalues[i]} has multiplicity {multiplicity}, so no eigenvector "
+            "of it is determined by T alone; a transition matrix with a degenerate leading eigenvalue "
+            "is reducible, with one such eigenvalue per recurrent component"
+        )
     vector = jnp.real(eigenvectors[:, i])
     sign = jnp.where(jnp.sum(vector) < 0, -1.0, 1.0)
     vector = vector * sign

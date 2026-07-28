@@ -1,6 +1,9 @@
 import jax
 import jax.numpy as jnp
+import pytest
 
+from generators.ghmm.process import init as init_ghmm
+from generators.ghmm.process import seq_prob as seq_prob_ghmm
 from generators.ghmm.process import validate as validate_ghmm
 from generators.nonergodic.ghmm import compile, generate, init, obs_dist, seq_prob
 from transition_matrices.classical import cycle
@@ -30,6 +33,36 @@ def test_compile():
     expected = expected.at[1, 3, 4].set(1)
     expected = expected.at[2, 4, 3].set(1)
     assert jnp.allclose(composite, expected)
+
+
+def test_compile_as_ghmm():
+    Ts_list = [
+        jnp.array(cycle(2)),
+        jnp.array(cycle(3, 1.0)),
+    ]
+    phi_list = [
+        jnp.array([0, 1]),
+        jnp.array([1, 2, 3]),
+    ]
+    beta_0 = jnp.array([0.25, 0.75])
+
+    # A compiled mixture is reducible by construction, so the base GHMM cannot infer
+    # its initial state — it is the start state compile writes the weights into.
+    composite = compile(Ts_list, phi_list, beta_0)
+    with pytest.raises(ValueError, match="reducible"):
+        init_ghmm(composite)
+
+    data = init_ghmm(composite, eta_0=jax.nn.one_hot(0, composite.shape[1]))
+    xs = jnp.array(
+        [
+            [1, 2, 3, 1, 2, 3],
+            [0, 1, 0, 1, 0, 1],
+            [1, 0, 1, 0, 1, 0],
+        ]
+    )
+    actual = jax.vmap(seq_prob_ghmm, in_axes=(None, 0))(data, xs)
+    expected = jax.vmap(seq_prob, in_axes=(None, 0))(init(Ts_list, phi_list, beta_0), xs)
+    assert jnp.allclose(actual, expected)
 
 
 def test_init():

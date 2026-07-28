@@ -76,9 +76,11 @@ def compile(Ts_list: list[jax.Array], sigma_list: list[jax.Array]) -> jax.Array:
 
 def init(Ts_list: list[jax.Array], sigma_emit_list: list[jax.Array], sigma_trans_list: list[jax.Array]) -> Data:
     Ts = stack(Ts_list)
-    factors = [jax.vmap(init_variant)(Ts_i) for Ts_i in Ts_list]
-    eta_0 = stack([factor.eta_0 for factor in factors])
-    w = stack([factor.w for factor in factors])
+    # Per variant rather than vmapped: init_variant raises on a reducible variant,
+    # which it cannot do under a trace.
+    factors = [[init_variant(Ts_ik) for Ts_ik in Ts_i] for Ts_i in Ts_list]
+    eta_0 = stack([jnp.stack([variant.eta_0 for variant in factor]) for factor in factors])
+    w = stack([jnp.stack([variant.w for variant in factor]) for factor in factors])
     Ks = jnp.array([Ts_i.shape[0] for Ts_i in Ts_list])
     Vs = jnp.array([Ts_i.shape[1] for Ts_i in Ts_list])
     Ss = jnp.array([Ts_i.shape[2] for Ts_i in Ts_list])
