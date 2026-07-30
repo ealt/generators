@@ -1,6 +1,9 @@
 import jax
 import jax.numpy as jnp
+import pytest
 
+from generators.ghmm.process import init as init_ghmm
+from generators.ghmm.process import seq_prob as seq_prob_ghmm
 from generators.ghmm.process import validate as validate_ghmm
 from generators.nonergodic.ghmm import compile, generate, init, obs_dist, seq_prob
 from transition_matrices.classical import cycle
@@ -30,6 +33,16 @@ def test_compile():
     expected = expected.at[1, 3, 4].set(1)
     expected = expected.at[2, 4, 3].set(1)
     assert jnp.allclose(composite, expected)
+
+    with pytest.raises(ValueError, match="multiplicity"):
+        init_ghmm(composite)
+
+    eta_0 = jax.nn.one_hot(0, composite.shape[1])
+    w = jnp.ones(composite.shape[1])
+    data = init_ghmm(composite, eta_0=eta_0, w=w)
+    assert jnp.allclose(data.eta_0, eta_0 / (eta_0 @ w))
+    assert jnp.allclose(data.w, w)
+    assert jnp.allclose(data.Ts, composite)
 
 
 def test_init():

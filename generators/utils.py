@@ -1,10 +1,18 @@
 import jax
 import jax.numpy as jnp
+from jax.experimental import checkify
 
 
 def principal_ev(T: jax.Array) -> jax.Array:
     eigenvalues, eigenvectors = jnp.linalg.eig(T)
-    i = jnp.argmax(jnp.abs(eigenvalues))
+    i = jnp.argmax(jnp.real(eigenvalues))
+    multiplicity = jnp.sum(jnp.isclose(eigenvalues, eigenvalues[i]))
+    checkify.check(
+        multiplicity <= 1,
+        "leading eigenvalue {ev} has multiplicity {m}",
+        ev=eigenvalues[i],
+        m=multiplicity,
+    )
     vector = jnp.real(eigenvectors[:, i])
     sign = jnp.where(jnp.sum(vector) < 0, -1.0, 1.0)
     vector = vector * sign

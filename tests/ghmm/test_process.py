@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import pytest
 
 from generators.ghmm.process import generate, init, seq_prob, validate
 from transition_matrices.classical import zero_one_random
@@ -12,6 +13,28 @@ def test_init():
     assert jnp.allclose(data.Ts, Ts)
     assert jnp.allclose(data.eta_0, jnp.ones(3) / 3)
     assert jnp.allclose(data.w, jnp.ones(3))
+
+
+def test_init_reducible():
+    Ts = jnp.array([
+        [
+            [1, 0],
+            [0, 0],
+        ],
+        [
+            [0, 0],
+            [0, 1],
+        ],
+    ])
+    assert validate(Ts)
+    with pytest.raises(ValueError, match="multiplicity"):
+        init(Ts)
+
+    eta_0 = jnp.ones(2) / 2
+    w = jnp.ones(2)
+    data = init(Ts, eta_0=eta_0, w=w)
+    assert jnp.allclose(data.eta_0, eta_0)
+    assert jnp.allclose(data.w, w)
 
 
 def test_generate():

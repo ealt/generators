@@ -2,6 +2,7 @@ from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
+from jax.experimental import checkify
 
 from generators.utils import principal_ev
 
@@ -26,10 +27,15 @@ def validate(Ts: jax.Array) -> bool:
     return bool(jnp.isclose(norm, 1))
 
 
-def init(Ts: jax.Array) -> Data:
+def init(Ts: jax.Array, eta_0: jax.Array | None = None, w: jax.Array | None = None) -> Data:
     T = Ts.sum(axis=0)
-    w = principal_ev(T)
-    eta_0 = principal_ev(T.T)
+    checked_ev = checkify.checkify(principal_ev)
+    if w is None:
+        err, w = checked_ev(T)
+        err.throw()
+    if eta_0 is None:
+        err, eta_0 = checked_ev(T.T)
+        err.throw()
     eta_0 /= eta_0 @ w
     return Data(Ts=Ts, eta_0=eta_0, w=w)
 
