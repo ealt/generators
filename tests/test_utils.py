@@ -15,10 +15,6 @@ def test_principal_ev():
     expected = jnp.array([2, 1]) * (2 / 3)
     assert jnp.allclose(actual, expected)
 
-
-def test_principal_ev_periodic():
-    # A 3-cycle's spectrum is the cube roots of unity: three eigenvalues of modulus 1,
-    # of which only the real one is Perron.
     T = jnp.array(
         [
             [0, 1, 0],
@@ -26,7 +22,9 @@ def test_principal_ev_periodic():
             [1, 0, 0],
         ]
     )
-    assert jnp.allclose(principal_ev(T), jnp.ones(3))
+    actual = principal_ev(T)
+    expected = jnp.ones(3)
+    assert jnp.allclose(actual, expected)
 
 
 def test_principal_ev_degenerate():
