@@ -72,6 +72,90 @@ def cycle(n: int, p: float = 0.5) -> jax.Array:
     return jnp.array(Ts)
 
 
+def _checksum_state(phase: jax.Array, residue: jax.Array, m: int) -> jax.Array:
+    """State index for a (phase, running sum mod m) pair in the checksum process.
+
+    Phase 0 always has a running sum of 0, so it collapses to the single seed state.
+
+    Args:
+        phase: Emission position within the block, in {0, ..., n}.
+        residue: Running sum mod m of the block's random symbols so far.
+        m: Modulus.
+
+    Returns:
+        State index, in {0, ..., n * m}.
+    """
+    return jnp.where(phase == 0, 0, 1 + (phase - 1) * m + residue)
+
+
+def checksum(probs: jax.Array) -> jax.Array:
+    """Checksum transition matrix.
+
+    The checksum process emits a block of n random symbols over an alphabet of size m,
+    then deterministically emits their sum mod m — the block's checksum — and repeats.
+    RRXOR is the n = 2, m = 2 case: two random bits followed by their XOR.
+
+    Internal state basis:
+    --------------------
+    A causal state is a (phase, running sum mod m) pair, where phase counts emissions
+    into the current block. The prefix itself does not matter, only its residue, so
+    there are n * m + 1 states ordered as
+
+        0                       phase 0, the seed state (running sum is always 0)
+        1 + (i - 1) * m + r     phase i in {1, ..., n}, running sum r
+
+    Phases 1 through n - 1 emit a random symbol; phase n emits the checksum r and
+    returns to the seed state. At n = 2, m = 2 this orders the states as
+
+        S, "0", "1", F, T
+
+    where "0"/"1" are the first bit and F/T are the XOR states, so it agrees with the
+    conventional RRXOR basis {S, "0", "1", T, F} up to the final transposition.
+
+    Derived quantities, all closed-form:
+
+        states          n * m + 1
+        stationary      1 / (n + 1) on the seed state; P(sum of first i symbols = r)
+                        / (n + 1) on (i, r)
+        entropy rate    sum_i H(probs[i]) / (n + 1) bits/symbol,
+                        which is n * log2(m) / (n + 1) for uniform rows
+
+    Args:
+        probs: Row-stochastic emission probabilities, shape (n, m). Row i is the
+            emission distribution of the i-th random symbol. Requires n >= 1 and
+            m >= 2.
+
+    Returns:
+        Transition matrix, shape (m, n * m + 1, n * m + 1).
+            Ts[o, j, k] = P(x_t=o, s_t=k | s_{t-1}=j)
+    """
+    assert probs.ndim == 2
+    n, m = probs.shape
+    assert n >= 1
+    assert m >= 2
+    assert jnp.allclose(probs.sum(axis=1), 1)
+
+    # Source states of the random phases: the seed state, then m states for each of
+    # phases 1 .. n - 1.
+    phases = jnp.concatenate([jnp.zeros(1, int), jnp.repeat(jnp.arange(1, n), m)])
+    residues = jnp.concatenate([jnp.zeros(1, int), jnp.tile(jnp.arange(m), n - 1)])
+
+    # Every random phase can emit any of the m symbols, carrying the running sum.
+    symbols = jnp.tile(jnp.arange(m), phases.size)
+    phases = jnp.repeat(phases, m)
+    residues = jnp.repeat(residues, m)
+    Ts = jnp.zeros((m, n * m + 1, n * m + 1))
+    Ts = Ts.at[
+        symbols,
+        _checksum_state(phases, residues, m),
+        _checksum_state(phases + 1, (residues + symbols) % m, m),
+    ].set(probs[phases, symbols])
+
+    # The checksum phase emits the running sum and returns to the seed state.
+    checksums = jnp.arange(m)
+    return Ts.at[checksums, _checksum_state(jnp.full(m, n), checksums, m), 0].set(1.0)
+
+
 def _mess_trans(x: float, s: int) -> jax.Array:
     r"""State transition matrix for Mess process.
 
