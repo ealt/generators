@@ -107,15 +107,18 @@ def test_checksum_stationary_distribution_biased():
     # With biased rows the residue masses follow the running-sum distribution.
     p1, p2 = 0.3, 0.7
     Ts = checksum(jnp.array([[p1, 1 - p1], [p2, 1 - p2]]))
-    expected = jnp.array(
-        [
-            1,  # seed
-            p1,  # phase 1, residue 0
-            1 - p1,  # phase 1, residue 1
-            p1 * p2 + (1 - p1) * (1 - p2),  # phase 2, residue 0
-            p1 * (1 - p2) + (1 - p1) * p2,  # phase 2, residue 1
-        ]
-    ) / 3
+    expected = (
+        jnp.array(
+            [
+                1,  # seed
+                p1,  # phase 1, residue 0
+                1 - p1,  # phase 1, residue 1
+                p1 * p2 + (1 - p1) * (1 - p2),  # phase 2, residue 0
+                p1 * (1 - p2) + (1 - p1) * p2,  # phase 2, residue 1
+            ]
+        )
+        / 3
+    )
     assert jnp.allclose(stationary(Ts), expected)
 
 
