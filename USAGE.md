@@ -48,7 +48,9 @@ This project inverts the relationship. It ships two things:
 
 1. **A specification.** [SPEC.md](SPEC.md) defines the mathematical
    objects and required behaviors, independent of any implementation,
-   with conformance test vectors.
+   with conformance test vectors in
+   [`conformance-tests.json`](conformance-tests.json) — see
+   [CONFORMANCE.md](CONFORMANCE.md) for what they cover so far.
 2. **Reference modules.** Small, human-crafted, self-contained
    implementations of the spec — correct starting points, written to be
    read and rewritten.
@@ -122,7 +124,9 @@ Everything else about the repo serves copyability:
 1. Copy the modules you need (and their module-level imports — check the
    top of each file; the dependency chains are shallow and explicit).
 2. Copy the relevant conformance vectors and wire them into your test
-   suite against your copy.
+   suite against your copy — `conformance-tests.json` plus
+   `tests/test_conformance.py`, whose one import you re-point at your
+   copy.
 3. Delete unused functions and modules.
 4. Adapt: add what your use case needs (belief-trajectory collection,
    batched generation, framing tokens, ...), optimize what it stresses.

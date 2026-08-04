@@ -1,3 +1,5 @@
+import math
+
 import jax.numpy as jnp
 import pytest
 
@@ -134,7 +136,7 @@ def test_projective_readout_is_a_two_state_classical_chain(phi, theta):
     # word law is exactly the symmetric order-1 binary Markov chain that repeats a symbol
     # with probability cos(phi / 2) ** 2, which this repo already has as mess(x, 1, 2).
     quantum = word_probs(quantum_rrxor(phi, theta), 6)
-    classical = word_probs(mess(jnp.sin(phi / 2) ** 2, 1.0, 2), 6)
+    classical = word_probs(mess(math.sin(phi / 2) ** 2, 1.0, 2), 6)
     assert quantum.keys() == classical.keys()
     for word in quantum:
         assert abs(quantum[word] - classical[word]) < 1e-6

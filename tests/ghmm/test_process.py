@@ -16,16 +16,18 @@ def test_init():
 
 
 def test_init_reducible():
-    Ts = jnp.array([
+    Ts = jnp.array(
         [
-            [1, 0],
-            [0, 0],
-        ],
-        [
-            [0, 0],
-            [0, 1],
-        ],
-    ])
+            [
+                [1, 0],
+                [0, 0],
+            ],
+            [
+                [0, 0],
+                [0, 1],
+            ],
+        ]
+    )
     assert validate(Ts)
     with pytest.raises(ValueError, match="multiplicity"):
         init(Ts)
