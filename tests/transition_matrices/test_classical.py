@@ -145,12 +145,20 @@ def test_checksum_entropy_rate_biased():
     assert jnp.allclose(entropy_rate(Ts), (h(p1) + h(p2)) / 3)
 
 
+@pytest.mark.parametrize("n", [1, 2, 4])
+def test_checksum_m_1_is_a_deterministic_cycle(n):
+    # A single-symbol alphabet makes every sum mod 1 zero, degenerating to a cycle of
+    # n + 1 states emitting the one symbol. Degenerate but well defined, so allowed.
+    Ts = checksum(jnp.ones((n, 1)))
+    assert Ts.shape == (1, n + 1, n + 1)
+    assert jnp.allclose(Ts.sum(axis=(0, 2)), 1)
+    assert jnp.allclose(Ts[0], jnp.roll(jnp.eye(n + 1), 1, axis=1))
+
+
 def test_checksum_rejects_invalid_probs():
     with pytest.raises(AssertionError):
         checksum(jnp.array([0.5, 0.5]))  # not 2-D
     with pytest.raises(AssertionError):
         checksum(jnp.array([[0.5, 0.4]]))  # row does not sum to 1
     with pytest.raises(AssertionError):
-        checksum(jnp.ones((2, 1)))  # m < 2
-    with pytest.raises(AssertionError):
-        checksum(jnp.zeros((0, 2)))  # n < 1
+        checksum(jnp.zeros((0, 2)))  # n = 0 would scatter to a negative state index
