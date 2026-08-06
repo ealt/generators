@@ -1,47 +1,35 @@
-"""Vocabulary augmentations: decouple emission-alphabet size from state-space size.
-
-Ported from simplex-research `src/transition_matrices/augmentations.py` (commit 00312f5b).
-"""
-
 import jax
 import jax.numpy as jnp
 
 
-def expand_vocab(Ts: jax.Array, f: int) -> jax.Array:
-    """Expand the vocabulary of a process.
+def apply_symbol_map(Ts: jax.Array, C: jax.Array) -> jax.Array:
+    assert C.shape[1] == Ts.shape[0]
+    assert jnp.allclose(C.sum(axis=0), 1.0)
+    return jnp.tensordot(C, Ts, axes=([1], [0]))
 
-    Each symbol of the original process is expanded into f symbols, splitting its mass
-    evenly among them. The marginal state chain, Ts.sum(axis=0), is unchanged.
 
-    Args:
-        Ts: Transition matrix, shape (V, S, S).
-        f: Factor to expand the vocabulary.
-
-    Returns:
-        Transition matrix, shape (V * f, S, S).
-    """
+def expand_map(V: int, f: int) -> jax.Array:
     assert f > 0
-    v = Ts.shape[0] * f
-    v_idx = jnp.arange(v) // f
-    return Ts[v_idx, :] / f
+    return jnp.repeat(jnp.eye(V) / f, f, axis=0)
 
 
-def compress_vocab(Ts: jax.Array, f: int) -> jax.Array:
-    """Compress the vocabulary of a process.
-
-    Each block of f consecutive symbols of the original process is compressed into 1
-    symbol. The marginal state chain, Ts.sum(axis=0), is unchanged: coarse-graining the
-    alphabet alters only what is observed, never the hidden dynamics. A compressed
-    process and its uncompressed twin therefore differ in exactly one variable, leaving
-    a large belief behind a small alphabet.
-
-    Args:
-        Ts: Transition matrix, shape (V, S, S). V must be divisible by f.
-        f: Factor to compress the vocabulary.
-
-    Returns:
-        Transition matrix, shape (V // f, S, S).
-    """
+def compress_map(V: int, f: int) -> jax.Array:
     assert f > 0
-    assert Ts.shape[0] % f == 0
-    return Ts.reshape((-1, f) + Ts.shape[1:]).sum(axis=1)
+    assert V % f == 0
+    return jnp.repeat(jnp.eye(V // f), f, axis=1)
+
+
+def noise_map(V: int, eps: float) -> jax.Array:
+    return (1.0 - eps) * jnp.eye(V) + (eps / V) * jnp.ones((V, V))
+
+
+def confusion_map(V: int, pairs: list[tuple[int, int]], eps: float) -> jax.Array:
+    """Asymmetric confusion: each (y, x) in pairs sends true y to observed x with probability eps.
+
+    Columns without a listed confusion stay as the identity. Shape (V, V).
+    """
+    C = jnp.eye(V)
+    for y, x in pairs:
+        C = C.at[y, y].add(-eps)
+        C = C.at[x, y].add(eps)
+    return C

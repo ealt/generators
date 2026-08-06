@@ -1,6 +1,12 @@
 import jax.numpy as jnp
 
-from transition_matrices.augmentations import compress_vocab, expand_vocab
+from transition_matrices.augmentations import (
+    apply_symbol_map,
+    compress_map,
+    confusion_map,
+    expand_map,
+    noise_map,
+)
 from transition_matrices.classical import mess
 
 
@@ -13,8 +19,10 @@ def test_expand_vocab():
     ay = 0.21  # a * y / f
     bx = 0.06  # b * x / f
     by = 0.14  # b * y / f
+    Ts = mess(x, a, s)
+    C = expand_map(Ts.shape[0], f)
     assert jnp.allclose(
-        expand_vocab(mess(x, a, s), f),
+        apply_symbol_map(Ts, C),
         jnp.array(
             [
                 [
@@ -47,8 +55,10 @@ def test_compress_vocab():
     ay = 0.08  # (a + (f - 1) * b) * y
     bx = 0.06  # f * b * x
     by = 0.02  # f * b * y
+    Ts = mess(x, a, s)
+    C = compress_map(Ts.shape[0], f)
     assert jnp.allclose(
-        compress_vocab(mess(x, a, s), f),
+        apply_symbol_map(Ts, C),
         jnp.array(
             [
                 [
@@ -68,6 +78,21 @@ def test_compress_vocab():
     )
 
 
-def test_compress_vocab_inverts_expand_vocab():
-    Ts = mess(0.15, 0.6, 4)
-    assert jnp.allclose(compress_vocab(expand_vocab(Ts, 3), 3), Ts)
+def test_noise_vocab():
+    eps = 0.3
+    Ts = mess(0.3, 0.7, 3)
+    C = noise_map(Ts.shape[0], eps)
+    Ts_noisy = apply_symbol_map(Ts, C)
+    diff = jnp.abs(Ts_noisy - Ts)
+    assert jnp.all(diff > 0)
+    assert jnp.all(diff <= eps)
+
+
+def test_confusion_vocab():
+    eps = 0.25
+    Ts = mess(0.3, 0.7, 3)
+    C = confusion_map(Ts.shape[0], [(0, 1)], eps)
+    Ts_conf = apply_symbol_map(Ts, C)
+    assert jnp.allclose(Ts_conf[0], (1 - eps) * Ts[0])
+    assert jnp.allclose(Ts_conf[1], Ts[1] + eps * Ts[0])
+    assert jnp.allclose(Ts_conf[2], Ts[2])
