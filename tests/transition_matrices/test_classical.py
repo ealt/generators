@@ -145,6 +145,30 @@ def test_checksum_entropy_rate_biased():
     assert jnp.allclose(entropy_rate(Ts), (h(p1) + h(p2)) / 3)
 
 
+@pytest.mark.parametrize(("n", "m"), [(1, 2), (2, 2), (2, 3), (3, 2), (3, 4)])
+def test_checksum_is_periodic_with_period_n_plus_1(n, m):
+    # Every state advances one phase per symbol, so the net matrix has exactly n + 1
+    # eigenvalues of modulus 1 -- the (n + 1)-th roots of unity. Power iteration on it
+    # cycles rather than converging, which is what the docstring warns about.
+    T = checksum(jnp.full((n, m), 1 / m)).sum(axis=0)
+    unit_circle = jnp.abs(jnp.abs(jnp.linalg.eigvals(T)) - 1) < 1e-5
+    assert int(unit_circle.sum()) == n + 1
+
+    # Concretely: from a point mass on the seed state, mass returns every n + 1 steps
+    # and is elsewhere phase-locked, so the iterates never settle.
+    seed = jnp.zeros(n * m + 1).at[0].set(1.0)
+    eta = seed
+    for _ in range(n + 1):
+        eta = eta @ T
+    assert jnp.allclose(eta, seed, atol=1e-5)
+
+    # Averaging over one period does give the stationary distribution.
+    iterates = [seed]
+    for _ in range(n):
+        iterates.append(iterates[-1] @ T)
+    assert jnp.allclose(jnp.stack(iterates).mean(axis=0), stationary(checksum(jnp.full((n, m), 1 / m))), atol=1e-5)
+
+
 @pytest.mark.parametrize("n", [1, 2, 4])
 def test_checksum_m_1_is_a_deterministic_cycle(n):
     # A single-symbol alphabet makes every sum mod 1 zero, degenerating to a cycle of

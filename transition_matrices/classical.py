@@ -104,6 +104,11 @@ def checksum(probs: jax.Array) -> jax.Array:
         entropy rate    sum_i H(probs[i]) / (n + 1) bits/symbol,
                         which is n * log2(m) / (n + 1) for uniform rows
 
+    The chain is periodic with period n + 1, since every state advances one phase per
+    symbol. Its net matrix therefore has n + 1 eigenvalues of modulus 1, and power
+    iteration does not converge to the stationary distribution — it cycles. Use an
+    eigensolver, or average the iterates over a full period.
+
     m = 1 degenerates to a deterministic cycle of n + 1 states over a single symbol.
 
     Args:
