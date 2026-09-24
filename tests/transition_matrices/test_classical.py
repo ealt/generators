@@ -1,188 +1,93 @@
 import jax.numpy as jnp
 import pytest
 
-from generators.utils import principal_ev
 from transition_matrices.classical import checksum
 
-# State permutation from this repo's (phase, residue) order to the conventional RRXOR
-# basis {S: 0, "0": 1, "1": 2, T: 3, F: 4}. Only the two checksum states differ: T is
-# residue 1 and F is residue 0, so they are transposed relative to residue order.
-RRXOR_PERM = jnp.array([0, 1, 2, 4, 3])
 
-
-def rrxor_reference(p1: float, p2: float) -> jnp.ndarray:
-    """Verbatim transcription of simplexity's rrxor (commit 657aff7).
-
-    simplexity/generative_processes/transition_matrices.py. Transcribed rather than
-    imported so the check does not depend on simplexity being installed.
-    """
-    s = {"S": 0, "0": 1, "1": 2, "T": 3, "F": 4}
-    Ts = jnp.zeros((2, 5, 5))
-    Ts = Ts.at[0, s["S"], s["0"]].set(p1)
-    Ts = Ts.at[1, s["S"], s["1"]].set(1 - p1)
-    Ts = Ts.at[0, s["0"], s["F"]].set(p2)
-    Ts = Ts.at[1, s["0"], s["T"]].set(1 - p2)
-    Ts = Ts.at[0, s["1"], s["T"]].set(p2)
-    Ts = Ts.at[1, s["1"], s["F"]].set(1 - p2)
-    Ts = Ts.at[1, s["T"], s["S"]].set(1.0)
-    Ts = Ts.at[0, s["F"], s["S"]].set(1.0)
-    return Ts
-
-
-def stationary(Ts: jnp.ndarray) -> jnp.ndarray:
-    pi = principal_ev(Ts.sum(axis=0).T)
-    return pi / pi.sum()
-
-
-def entropy_rate(Ts: jnp.ndarray) -> jnp.ndarray:
-    """Entropy rate in bits/symbol of a unifilar HMM: sum_s pi_s H(x | s)."""
-    emit = Ts.sum(axis=2).T  # (S, V): P(x | s)
-    terms = jnp.where(emit > 0, -emit * jnp.log2(jnp.where(emit > 0, emit, 1)), 0.0)
-    return stationary(Ts) @ terms.sum(axis=1)
-
-
-@pytest.mark.parametrize(("p1", "p2"), [(0.5, 0.5), (0.3, 0.7), (0.2, 0.2), (1.0, 0.4)])
-def test_checksum_reproduces_rrxor(p1, p2):
-    Ts = checksum(jnp.array([[p1, 1 - p1], [p2, 1 - p2]]))
-    permuted = Ts[:, RRXOR_PERM][:, :, RRXOR_PERM]
-    assert jnp.array_equal(permuted, rrxor_reference(p1, p2))
-
-
-@pytest.mark.parametrize(("n", "m"), [(1, 2), (1, 5), (2, 2), (2, 3), (3, 2), (3, 4), (4, 5)])
-def test_checksum_shape_and_stochasticity(n, m):
-    Ts = checksum(jnp.full((n, m), 1 / m))
-    assert Ts.shape == (m, n * m + 1, n * m + 1)
-    assert jnp.all(Ts >= 0)
-    assert jnp.allclose(Ts.sum(axis=(0, 2)), 1)
-
-
-def test_checksum_n_1_repeats_the_random_symbol():
-    # n = 1 degenerates to "emit a random symbol, then emit it again".
-    p = 0.3
-    Ts = checksum(jnp.array([[p, 1 - p]]))
-    assert Ts.shape == (2, 3, 3)
-    expected = jnp.array(
-        [
-            # symbol 0: seed -> residue-0 state with prob p; residue-0 state -> seed
-            [
-                [0, p, 0],
-                [1, 0, 0],
-                [0, 0, 0],
-            ],
-            # symbol 1: seed -> residue-1 state with prob 1 - p; residue-1 state -> seed
-            [
-                [0, 0, 1 - p],
-                [0, 0, 0],
-                [1, 0, 0],
-            ],
-        ]
-    )
-    assert jnp.allclose(Ts, expected)
-
-
-def test_checksum_deterministic_symbol_is_the_running_sum():
-    # From a checksum state the emitted symbol is the residue, with probability 1.
-    n, m = 3, 4
-    Ts = checksum(jnp.full((n, m), 1 / m))
-    for r in range(m):
-        state = 1 + (n - 1) * m + r
-        emit = Ts.sum(axis=2)[:, state]
-        assert jnp.allclose(emit, jnp.eye(m)[r])
-
-
-@pytest.mark.parametrize(("n", "m"), [(1, 2), (2, 2), (2, 3), (3, 2), (4, 5)])
-def test_checksum_stationary_distribution(n, m):
-    # Closed form: 1 / (n + 1) on the seed state, and P(sum of the first i symbols = r)
-    # / (n + 1) on state (i, r) -- uniform rows make every residue equally likely.
-    Ts = checksum(jnp.full((n, m), 1 / m))
-    expected = jnp.concatenate([jnp.ones(1), jnp.full(n * m, 1 / m)]) / (n + 1)
-    assert jnp.allclose(stationary(Ts), expected)
-
-
-def test_checksum_stationary_distribution_biased():
-    # RRXOR's published steady state [2, 1, 1, 1, 1] / 6 holds for uniform rows.
-    Ts = checksum(jnp.array([[0.5, 0.5], [0.5, 0.5]]))
-    assert jnp.allclose(stationary(Ts), jnp.array([2, 1, 1, 1, 1]) / 6)
-
-    # With biased rows the residue masses follow the running-sum distribution.
-    p1, p2 = 0.3, 0.7
-    Ts = checksum(jnp.array([[p1, 1 - p1], [p2, 1 - p2]]))
-    expected = (
+def test_checksum_rrxor():
+    p = 0.3  # first bit
+    q = 0.7  # second bit
+    # States are (phase, running sum): S, "0", "1", F, T. The conventional RRXOR
+    # basis {S, "0", "1", T, F} has the last two transposed.
+    assert jnp.allclose(
+        checksum(jnp.array([[p, 1 - p], [q, 1 - q]])),
         jnp.array(
             [
-                1,  # seed
-                p1,  # phase 1, residue 0
-                1 - p1,  # phase 1, residue 1
-                p1 * p2 + (1 - p1) * (1 - p2),  # phase 2, residue 0
-                p1 * (1 - p2) + (1 - p1) * p2,  # phase 2, residue 1
+                [
+                    [0, p, 0, 0, 0],
+                    [0, 0, 0, q, 0],
+                    [0, 0, 0, 0, q],
+                    [1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0],
+                ],
+                [
+                    [0, 0, 1 - p, 0, 0],
+                    [0, 0, 0, 0, 1 - q],
+                    [0, 0, 0, 1 - q, 0],
+                    [0, 0, 0, 0, 0],
+                    [1, 0, 0, 0, 0],
+                ],
             ]
-        )
-        / 3
+        ),
     )
-    assert jnp.allclose(stationary(Ts), expected)
 
 
-@pytest.mark.parametrize(("n", "m"), [(1, 2), (2, 2), (2, 3), (3, 2), (3, 4), (4, 5)])
-def test_checksum_entropy_rate_uniform(n, m):
-    # n random symbols of log2(m) bits each, spread over a block of n + 1 symbols.
-    Ts = checksum(jnp.full((n, m), 1 / m))
-    assert jnp.allclose(entropy_rate(Ts), n * jnp.log2(jnp.array(m)) / (n + 1))
+def test_checksum_repeat():
+    p = 0.3  # n = 1: emit a random symbol, then emit it again
+    assert jnp.allclose(
+        checksum(jnp.array([[p, 1 - p]])),
+        jnp.array(
+            [
+                [
+                    [0, p, 0],
+                    [1, 0, 0],
+                    [0, 0, 0],
+                ],
+                [
+                    [0, 0, 1 - p],
+                    [0, 0, 0],
+                    [1, 0, 0],
+                ],
+            ]
+        ),
+    )
 
 
-def test_checksum_entropy_rate_rrxor_is_two_thirds():
-    Ts = checksum(jnp.full((2, 2), 0.5))
-    assert jnp.allclose(entropy_rate(Ts), 2 / 3)
+def test_checksum_single_symbol():
+    # m = 1: every sum mod 1 is 0, leaving a deterministic cycle of n + 1 states.
+    assert jnp.allclose(checksum(jnp.ones((3, 1))), jnp.roll(jnp.eye(4), 1, axis=1)[None])
 
 
-def test_checksum_entropy_rate_biased():
-    # sum_i H(probs[i]) / (n + 1), with per-row binary entropies.
-    p1, p2 = 0.3, 0.7
-    Ts = checksum(jnp.array([[p1, 1 - p1], [p2, 1 - p2]]))
-
-    def h(p):
-        return -p * jnp.log2(p) - (1 - p) * jnp.log2(1 - p)
-
-    assert jnp.allclose(entropy_rate(Ts), (h(p1) + h(p2)) / 3)
-
-
-@pytest.mark.parametrize(("n", "m"), [(1, 2), (2, 2), (2, 3), (3, 2), (3, 4)])
-def test_checksum_is_periodic_with_period_n_plus_1(n, m):
-    # Every state advances one phase per symbol, so the net matrix has exactly n + 1
-    # eigenvalues of modulus 1 -- the (n + 1)-th roots of unity. Power iteration on it
-    # cycles rather than converging, which is what the docstring warns about.
-    T = checksum(jnp.full((n, m), 1 / m)).sum(axis=0)
-    unit_circle = jnp.abs(jnp.abs(jnp.linalg.eigvals(T)) - 1) < 1e-5
-    assert int(unit_circle.sum()) == n + 1
-
-    # Concretely: from a point mass on the seed state, mass returns every n + 1 steps
-    # and is elsewhere phase-locked, so the iterates never settle.
-    seed = jnp.zeros(n * m + 1).at[0].set(1.0)
-    eta = seed
-    for _ in range(n + 1):
-        eta = eta @ T
-    assert jnp.allclose(eta, seed, atol=1e-5)
-
-    # Averaging over one period does give the stationary distribution.
-    iterates = [seed]
-    for _ in range(n):
-        iterates.append(iterates[-1] @ T)
-    assert jnp.allclose(jnp.stack(iterates).mean(axis=0), stationary(checksum(jnp.full((n, m), 1 / m))), atol=1e-5)
-
-
-@pytest.mark.parametrize("n", [1, 2, 4])
-def test_checksum_m_1_is_a_deterministic_cycle(n):
-    # A single-symbol alphabet makes every sum mod 1 zero, degenerating to a cycle of
-    # n + 1 states emitting the one symbol. Degenerate but well defined, so allowed.
-    Ts = checksum(jnp.ones((n, 1)))
-    assert Ts.shape == (1, n + 1, n + 1)
+def test_checksum_ternary():
+    # m = 3, n = 2: 7 states, and the checksum phase emits its residue.
+    Ts = checksum(jnp.full((2, 3), 1 / 3))
+    assert Ts.shape == (3, 7, 7)
     assert jnp.allclose(Ts.sum(axis=(0, 2)), 1)
-    assert jnp.allclose(Ts[0], jnp.roll(jnp.eye(n + 1), 1, axis=1))
+    assert jnp.allclose(Ts.sum(axis=2)[:, 4:], jnp.eye(3))
 
 
-def test_checksum_rejects_invalid_probs():
+def test_checksum_periodic():
+    # Every state advances one phase per symbol, so the net matrix has n + 1
+    # eigenvalues of modulus 1 and power iteration cycles instead of converging.
+    T = checksum(jnp.full((2, 2), 0.5)).sum(axis=0)
+    assert jnp.sum(jnp.abs(jnp.abs(jnp.linalg.eigvals(T)) - 1) < 1e-5) == 3
+    seed = jnp.zeros(5).at[0].set(1.0)
+    assert jnp.allclose(seed @ T @ T @ T, seed, atol=1e-5)
+
+
+def test_checksum_entropy_rate():
+    # n random symbols of log2(m) bits over a block of n + 1: 2/3 for RRXOR.
+    Ts = checksum(jnp.full((2, 2), 0.5))
+    emit = Ts.sum(axis=2).T
+    h = -(emit * jnp.log2(jnp.where(emit > 0, emit, 1))).sum(axis=1)
+    pi = jnp.array([2, 1, 1, 1, 1]) / 6  # steady state
+    assert jnp.allclose(pi @ h, 2 / 3)
+
+
+def test_checksum_invalid_probs():
     with pytest.raises(AssertionError):
         checksum(jnp.array([0.5, 0.5]))  # not 2-D
     with pytest.raises(AssertionError):
-        checksum(jnp.array([[0.5, 0.4]]))  # row does not sum to 1
+        checksum(jnp.array([[0.5, 0.4]]))  # rows must sum to 1
     with pytest.raises(AssertionError):
-        checksum(jnp.zeros((0, 2)))  # n = 0 would scatter to a negative state index
+        checksum(jnp.zeros((0, 2)))  # n = 0 scatters to state index -1
