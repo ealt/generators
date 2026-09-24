@@ -72,6 +72,75 @@ def cycle(n: int, p: float = 0.5) -> jax.Array:
     return jnp.array(Ts)
 
 
+def checksum(probs: jax.Array) -> jax.Array:
+    """Checksum transition matrix.
+
+    The checksum process emits a block of n random symbols over an alphabet of size m,
+    then deterministically emits their sum mod m — the block's checksum — and repeats.
+    RRXOR is the n = 2, m = 2 case: two random bits followed by their XOR.
+
+    Internal state basis:
+    --------------------
+    A causal state is a (phase, running sum mod m) pair, where phase counts emissions
+    into the current block. The prefix itself does not matter, only its residue, so
+    there are n * m + 1 states ordered as
+
+        0                       phase 0, the seed state (running sum is always 0)
+        1 + (i - 1) * m + r     phase i in {1, ..., n}, running sum r
+
+    Phases 0 through n - 1 emit a random symbol; phase n emits the checksum r and
+    returns to the seed state. At n = 2, m = 2 this orders the states as
+
+        S, "0", "1", F, T
+
+    where "0"/"1" are the first bit and F/T are the XOR states, so it agrees with the
+    conventional RRXOR basis {S, "0", "1", T, F} up to the final transposition.
+
+    Derived quantities, all closed-form:
+
+        states          n * m + 1
+        stationary      1 / (n + 1) on the seed state; P(sum of first i symbols = r)
+                        / (n + 1) on (i, r)
+        entropy rate    sum_i H(probs[i]) / (n + 1) bits/symbol,
+                        which is n * log2(m) / (n + 1) for uniform rows
+
+    The chain is periodic with period n + 1, since every state advances one phase per
+    symbol. Its net matrix therefore has n + 1 eigenvalues of modulus 1, and power
+    iteration does not converge to the stationary distribution — it cycles. Use an
+    eigensolver, or average the iterates over a full period.
+
+    m = 1 degenerates to a deterministic cycle of n + 1 states over a single symbol.
+
+    Args:
+        probs: Row-stochastic emission probabilities, shape (n, m). Row i is the
+            emission distribution of the i-th random symbol. Requires n >= 1.
+
+    Returns:
+        Transition matrix, shape (m, n * m + 1, n * m + 1).
+            Ts[o, j, k] = P(x_t=o, s_t=k | s_{t-1}=j)
+    """
+    assert probs.ndim == 2
+    n, m = probs.shape
+    assert n >= 1  # n = 0 scatters to state index -1, which JAX silently clamps instead of raising.
+    assert jnp.allclose(probs.sum(axis=1), 1)
+
+    num_states = n * m + 1
+    Ts = jnp.zeros((m, num_states, num_states))
+
+    symbols = jnp.tile(jnp.arange(m), num_states - m)
+    sources = jnp.repeat(jnp.arange(num_states - m), m)
+    phases = jnp.concatenate([jnp.zeros(1, int), jnp.repeat(jnp.arange(1, n), m)])
+    residues = jnp.concatenate([jnp.zeros(1, int), jnp.tile(jnp.arange(m), n - 1)])
+    source_phases = jnp.repeat(phases, m)
+    source_residues = jnp.repeat(residues, m)
+    destinations = 1 + source_phases * m + (source_residues + symbols) % m
+    Ts = Ts.at[symbols, sources, destinations].set(probs[source_phases, symbols])
+
+    checksums = jnp.arange(m)
+    final_sources = num_states - m + checksums
+    return Ts.at[checksums, final_sources, 0].set(1.0)
+
+
 def _mess_trans(x: float, s: int) -> jax.Array:
     r"""State transition matrix for Mess process.
 
