@@ -124,11 +124,11 @@ def checksum(probs: jax.Array) -> jax.Array:
     assert n >= 1  # n = 0 scatters to state index -1, which JAX silently clamps instead of raising.
     assert jnp.allclose(probs.sum(axis=1), 1)
 
-    states = n * m + 1
-    Ts = jnp.zeros((m, states, states))
+    num_states = n * m + 1
+    Ts = jnp.zeros((m, num_states, num_states))
 
-    symbols = jnp.tile(jnp.arange(m), states - m)
-    sources = jnp.repeat(jnp.arange(states - m), m)
+    symbols = jnp.tile(jnp.arange(m), num_states - m)
+    sources = jnp.repeat(jnp.arange(num_states - m), m)
     phases = jnp.concatenate([jnp.zeros(1, int), jnp.repeat(jnp.arange(1, n), m)])
     residues = jnp.concatenate([jnp.zeros(1, int), jnp.tile(jnp.arange(m), n - 1)])
     source_phases = jnp.repeat(phases, m)
@@ -137,7 +137,7 @@ def checksum(probs: jax.Array) -> jax.Array:
     Ts = Ts.at[symbols, sources, destinations].set(probs[source_phases, symbols])
 
     checksums = jnp.arange(m)
-    final_sources = states - m + checksums
+    final_sources = num_states - m + checksums
     return Ts.at[checksums, final_sources, 0].set(1.0)
 
 
