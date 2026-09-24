@@ -121,29 +121,24 @@ def checksum(probs: jax.Array) -> jax.Array:
     """
     assert probs.ndim == 2
     n, m = probs.shape
-    # n = 0 scatters to state index -1, which JAX silently clamps instead of raising.
-    assert n >= 1
+    assert n >= 1  # n = 0 scatters to state index -1, which JAX silently clamps instead of raising.
     assert jnp.allclose(probs.sum(axis=1), 1)
 
-    # The states that emit a random symbol are the seed state followed by m states for
-    # each of phases 1 .. n - 1. Their position in these arrays is their state index.
+    states = n * m + 1
+    Ts = jnp.zeros((m, states, states))
+
+    symbols = jnp.tile(jnp.arange(m), states - m)
+    sources = jnp.repeat(jnp.arange(states - m), m)
     phases = jnp.concatenate([jnp.zeros(1, int), jnp.repeat(jnp.arange(1, n), m)])
     residues = jnp.concatenate([jnp.zeros(1, int), jnp.tile(jnp.arange(m), n - 1)])
-
-    # Each of them can emit any of the m symbols, carrying the running sum to the next
-    # phase, whose states start at 1 + (phase + 1 - 1) * m.
-    sources = jnp.repeat(jnp.arange(phases.size), m)
-    symbols = jnp.tile(jnp.arange(m), phases.size)
     source_phases = jnp.repeat(phases, m)
     source_residues = jnp.repeat(residues, m)
     destinations = 1 + source_phases * m + (source_residues + symbols) % m
-
-    Ts = jnp.zeros((m, n * m + 1, n * m + 1))
     Ts = Ts.at[symbols, sources, destinations].set(probs[source_phases, symbols])
 
-    # The checksum states follow the random ones. Each emits its residue and resets.
     checksums = jnp.arange(m)
-    return Ts.at[checksums, phases.size + checksums, 0].set(1.0)
+    final_sources = size - m + checksums
+    return Ts.at[checksums, final_sources, 0].set(1.0)
 
 
 def _mess_trans(x: float, s: int) -> jax.Array:
