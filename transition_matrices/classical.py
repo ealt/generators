@@ -137,7 +137,7 @@ def checksum(probs: jax.Array) -> jax.Array:
     Ts = Ts.at[symbols, sources, destinations].set(probs[source_phases, symbols])
 
     checksums = jnp.arange(m)
-    final_sources = size - m + checksums
+    final_sources = states - m + checksums
     return Ts.at[checksums, final_sources, 0].set(1.0)
 
 
