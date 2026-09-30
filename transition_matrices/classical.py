@@ -1,3 +1,5 @@
+import itertools as it
+
 import jax
 import jax.numpy as jnp
 
@@ -38,38 +40,60 @@ def cycle(n: int, p: float = 0.5) -> jax.Array:
     A symbol is deterministically emitted based on the current state.
 
     Args:
-        n: Number of states. Must be greater than 0.
+        n: Number of states.
         p: Transition probability to the next state.
-            Ignored for n = 1 or 2.
-            q = 1 - p: Transition probability to the previous state.
+            1 - p: Transition probability to the previous state.
 
     Returns:
-        Transition matrix.
+        Transition matrix, shape (n, n, n)
+            Ts[o, j, k] = P(x_t=o, s_t=k | s_{t-1}=j)
     """
     assert n > 0
-    if n == 1:
-        return jnp.ones((1, 1, 1))
-    if n == 2:
-        return jnp.array(
-            [
-                [
-                    [0, 1],
-                    [0, 0],
-                ],
-                [
-                    [0, 0],
-                    [1, 0],
-                ],
-            ]
-        )
     assert p >= 0
     assert p <= 1
-    q = 1 - p
-    Ts: list[list[list[float]]] = [[[0.0 for _ in range(n)] for _ in range(n)] for _ in range(n)]
-    for i in range(n):
-        Ts[i][i][(i + 1) % n] = p
-        Ts[i][i][(i - 1) % n] = q
-    return jnp.array(Ts)
+
+    states = jnp.arange(n)
+    next_states = jnp.mod(states + 1, n)
+    prev_states = jnp.mod(states - 1, n)
+    Ts = jnp.zeros((n, n, n))
+    Ts = Ts.at[states, states, next_states].add(p)
+    Ts = Ts.at[states, states, prev_states].add(1-p)
+    return Ts
+
+def periodic_grid(shape: tuple[int, ...]) -> jax.Array:
+    """Periodic grid transition matrix.
+
+    The periodic grid process is a random walk on periodic grid.
+    The number of states is equal to the product of dimension sizes.
+    A symbol is deterministically emitted based on the previous state.
+
+    Return a 3D array of size num_states^3
+    even though everything is determined by a 2D matrix of size num_states^2
+    Ts[o, j, k] = \delta(o, j) * T[j, k]
+
+    Args:
+        shape: the shape of the grid.
+
+    Returns:
+        Transition matrix
+            Ts[o, j, k] = P(x_t=o, s_t=k | s_{t-1}=j)
+    """
+    assert all(size > 0 for size in shape)
+    ndim = len(shape)
+    num_neighbors = 2 * ndim
+
+    all_coords = jnp.indices(shape, dtype=jnp.int32).reshape(ndim, -1).T
+    num_states = all_coords.shape[0]
+    basis = jnp.eye(ndim, dtype=jnp.int32)
+    directions = jnp.concatenate([basis, -basis])
+
+    dest_coords = (all_coords[:, None, :] + directions[None, :, :]) % jnp.array(shape, dtype=jnp.int32)
+    dest = jnp.ravel_multi_index(tuple(jnp.moveaxis(dest_coords, -1, 0)), shape)
+    source = jnp.broadcast_to(jnp.arange(num_states)[:, None], dest.shape) 
+
+    Ts = jnp.zeros((num_states, num_states, num_states))
+    Ts = Ts.at[source, source, dest].add(1 / num_neighbors)
+    return Ts
 
 
 def checksum(probs: jax.Array) -> jax.Array:
@@ -141,74 +165,71 @@ def checksum(probs: jax.Array) -> jax.Array:
     return Ts.at[checksums, final_sources, 0].set(1.0)
 
 
-def _mess_trans(x: float, s: int) -> jax.Array:
-    r"""State transition matrix for Mess process.
+def mess(x: float, a: float, s: int) -> jax.Array:
+    r"""Mess process.
+
+    A fully connected, highly symmetric process where it is possible to:
+    - transition from any state to any other state
+      - transitions to any different state all happen with equal probability x
+      - remaining in the same state in general has a different probability
+    - emit any token during any transition
+      - the vocab size equals the number of states
+      - there is a unique token for each state that is emitted with probability a
+      - all other tokens are emitted with equal probability
+
+    The fact that each latent state has a single unique token it emits
+    with a different probability from the other tokens is what makes it possible
+    to asymtotically converge a belief state to the actual latent state of the system.
 
     Args:
         x: Transition probability to each other state.
             x = P(s_t = s' \forall s' \in {0, ..., s-1} \ s')
             y: Probability of staying in the same state.
             y = P(s_t = s_t-1)
-        s: Number of states
-
-    Returns:
-        State transition matrix
-            T[i, j] = P(s_t = i | s_{t-1} = j)
-            T[i, i] = y
-            T[i, j] = x for i != j
-    """
-    assert x >= 0
-    assert x <= 1
-    y = 1 - (s - 1) * x
-    assert y >= 0
-    assert y <= 1
-    return (x * (jnp.ones((s, s)) - jnp.eye(s))) + (y * jnp.eye(s))
-
-
-def _mess_emit(a: float, s: int) -> jax.Array:
-    r"""Emission matrix for Mess process.
-
-    Args:
         a: Emission probability corresponding to the previous state.
             a = P(x_t = s_t-1)
             b: Emission probabilities for each other value.
             b = P(x_t = s' \forall s' \in S_{t-1})
         s: Number of states
-        rd: Ratio difference
-            If the vocab size to state size ratio, V : S
-            is reduced, num : denom (V / S = num / denom)
-            rd := num - denom
+            Vocab size equals number of states
+            must be greater than 1
 
     Returns:
-        Emission matrix
-            Tv[i, j] = P(x_t = j | s_t = i)
-            Tv[i, i] = a
-            Tv[i, j] = b for i != j
-    """
-    assert a >= 0
-    assert a <= 1
-    b = (1 - a) / (s - 1)
-
-    return (a * jnp.eye(s)) + (b * (jnp.ones((s, s)) - jnp.eye(s)))
-
-
-def mess(x: float, a: float, s: int) -> jax.Array:
-    r"""Mess process.
-
-    Args:
-        x: Transition probability to each other state.
-        a: Emission probability corresponding to the previous state.
-        s: Number of states
-        rd: Ratio difference
-
-    Returns:
-        Transition matrix
+        Transition matrix, shape (s, s, s)
             Ts[o, j, k] = P(x_t=o, s_t=k | s_{t-1}=j)
     """
-    assert s > 0
-    T_trans = _mess_trans(x, s)
-    T_emit = _mess_emit(a, s)
+    assert s > 1
 
-    # Ts[o, j, k] = P(x_t=o, s_t=k | s_{t-1}=j) = Tv[k, o] * T[k, j]
+    def trans(x: float, s: int) -> jax.Array:
+        r"""State transition matrix for Mess process.
+
+        T[i, j] = P(s_t = i | s_{t-1} = j)
+        T[i, i] = y
+        T[i, j] = x for i != j
+        """
+        assert x >= 0
+        assert x <= 1
+        y = 1 - (s - 1) * x
+        assert y >= 0
+        return (x * (jnp.ones((s, s)) - jnp.eye(s))) + (y * jnp.eye(s))
+
+
+    def emit(a: float, s: int) -> jax.Array:
+        r"""Emission matrix for Mess process.
+
+        Tv[i, j] = P(x_t = j | s_t = i)
+        Tv[i, i] = a
+        Tv[i, j] = b for i != j
+        """
+        assert a >= 0
+        assert a <= 1
+        b = (1 - a) / (s - 1)
+
+        return (a * jnp.eye(s)) + (b * (jnp.ones((s, s)) - jnp.eye(s)))
+
+    T_trans = trans(x, s)
+    T_emit = emit(a, s)
+
+
     inner = T_emit[:, :, None] * T_trans[None, :, :]
     return jnp.transpose(inner, (0, 2, 1))
